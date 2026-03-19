@@ -1,0 +1,108 @@
+<UserControl x:Class="SysCleaner.Wpf.Views.RegistrySearchView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource Brush.SurfaceMuted}">
+            <StackPanel>
+                <TextBlock Style="{StaticResource PageTitleTextStyle}" Text="注册表搜索" />
+                <TextBlock Style="{StaticResource PageSubtitleTextStyle}" Text="全文搜索常见注册表分支，并对结果执行批量删除、批量编辑和替换值数据。" />
+                <WrapPanel Margin="0,18,0,0">
+                    <TextBox Width="300" Text="{Binding Query, UpdateSourceTrigger=PropertyChanged}" />
+                    <Button Content="搜索注册表" Command="{Binding SearchCommand}" />
+                    <Button Style="{StaticResource SecondaryButtonStyle}" Content="导出结果" Command="{Binding ExportResultsCommand}" />
+                    <Button Style="{StaticResource SecondaryButtonStyle}" Content="全选" Command="{Binding SelectAllCommand}" />
+                    <Button Style="{StaticResource SecondaryButtonStyle}" Content="清空选择" Command="{Binding ClearSelectionCommand}" />
+                    <Button Style="{StaticResource WarningButtonStyle}" Content="批量编辑" Command="{Binding UpdateSelectedCommand}" />
+                    <Button Style="{StaticResource WarningButtonStyle}" Content="替换模式" Command="{Binding ReplaceSelectedCommand}" />
+                    <Button Style="{StaticResource DangerButtonStyle}" Content="批量删除" Command="{Binding DeleteSelectedCommand}" />
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+
+        <WrapPanel Grid.Row="1" Margin="0,18,0,0" ItemWidth="460">
+            <Border Width="460" Margin="0,0,18,18" Style="{StaticResource CardBorderStyle}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="搜索范围与筛选" />
+                    <TextBlock Margin="0,6,0,0" Text="先限定命中范围，再筛选可编辑/可删除项，能明显降低误操作概率。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                    <WrapPanel Margin="0,16,0,0">
+                        <CheckBox IsChecked="{Binding SearchKeyPath}" Content="搜索键路径" />
+                        <CheckBox IsChecked="{Binding SearchValueName}" Content="搜索值名称" />
+                        <CheckBox IsChecked="{Binding SearchValueData}" Content="搜索值数据" />
+                    </WrapPanel>
+                    <WrapPanel>
+                        <CheckBox IsChecked="{Binding ShowOnlyEditable}" Content="仅显示可编辑项" />
+                        <CheckBox IsChecked="{Binding ShowOnlyDeletable}" Content="仅显示可删除项" />
+                        <CheckBox IsChecked="{Binding ExportSelectedOnly}" Content="导出时仅已选中项" />
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Width="460" Margin="0,0,18,18" Style="{StaticResource CardBorderStyle}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="批量编辑与替换" />
+                    <TextBlock Margin="0,6,0,0" Text="编辑模式直接写入新值；替换模式会在选中值数据中查找旧内容并写回新内容。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+
+                    <TextBlock Margin="0,16,0,6" Text="批量编辑新值" FontWeight="SemiBold" Foreground="{StaticResource Brush.PrimaryText}" />
+                    <TextBox Margin="0,0,0,0" Text="{Binding NewValue, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Margin="0,6,0,0" Text="批量编辑只对可编辑的值类型生效，支持字符串、可扩展字符串、多字符串、DWORD、QWORD。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+
+                    <TextBlock Margin="0,16,0,6" Text="替换模式" FontWeight="SemiBold" Foreground="{StaticResource Brush.PrimaryText}" />
+                    <WrapPanel>
+                        <TextBox Width="190" Text="{Binding ReplaceOldValue, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBox Width="190" Text="{Binding ReplaceNewValue, UpdateSourceTrigger=PropertyChanged}" />
+                    </WrapPanel>
+                    <WrapPanel>
+                        <CheckBox IsChecked="{Binding ReplaceMatchCase}" Content="区分大小写" />
+                        <CheckBox IsChecked="{Binding ReplaceWholeWord}" Content="全词匹配" />
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+        </WrapPanel>
+
+        <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}" Margin="0,18,0,0" Padding="20,16,20,20">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="搜索结果" />
+                    <TextBlock Margin="0,6,0,0" Text="批量操作前请至少检查根键、键路径和值类型三列，避免跨分支误删。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                </StackPanel>
+
+                <DataGrid Grid.Row="1" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}" IsReadOnly="False">
+                    <DataGrid.ContextMenu>
+                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                            <MenuItem Header="搜索注册表" Command="{Binding SearchCommand}" />
+                            <Separator />
+                            <MenuItem Header="选中当前项" Command="{Binding SelectCurrentCommand}" />
+                            <MenuItem Header="仅保留当前项" Command="{Binding SelectOnlyCurrentCommand}" />
+                            <MenuItem Header="复制当前位置" Command="{Binding CopySelectedLocationCommand}" />
+                            <Separator />
+                            <MenuItem Header="编辑当前项" Command="{Binding UpdateCurrentCommand}" />
+                            <MenuItem Header="替换当前项" Command="{Binding ReplaceCurrentCommand}" />
+                            <MenuItem Header="删除当前项" Command="{Binding DeleteCurrentCommand}" />
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
+                    <DataGrid.Columns>
+                        <DataGridCheckBoxColumn Header="选择" Binding="{Binding IsSelected}" Width="*" />
+                        <DataGridTextColumn Header="类型" Binding="{Binding Result.EntryType}" Width="*" IsReadOnly="True" />
+                        <DataGridTextColumn Header="命中" Binding="{Binding Result.MatchTarget}" Width="*" IsReadOnly="True" />
+                        <DataGridTextColumn Header="根键" Binding="{Binding Result.HiveName}" Width="*" IsReadOnly="True" />
+                        <DataGridTextColumn Header="键路径" Binding="{Binding Result.KeyPath}" Width="2*" IsReadOnly="True" />
+                        <DataGridTextColumn Header="值名称" Binding="{Binding Result.ValueName}" Width="*" IsReadOnly="True" />
+                        <DataGridTextColumn Header="值数据" Binding="{Binding Result.ValueData}" Width="2*" IsReadOnly="True" />
+                        <DataGridTextColumn Header="值类型" Binding="{Binding Result.ValueKind}" Width="*" IsReadOnly="True" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

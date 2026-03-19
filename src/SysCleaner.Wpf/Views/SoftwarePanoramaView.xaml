@@ -1,0 +1,120 @@
+<UserControl x:Class="SysCleaner.Wpf.Views.SoftwarePanoramaView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource Brush.SurfaceMuted}">
+            <StackPanel>
+                <TextBlock Style="{StaticResource PageTitleTextStyle}" Text="软件全景" />
+                <TextBlock Style="{StaticResource PageSubtitleTextStyle}" Text="按软件汇总残留、注册表、启动项、右键菜单、计划任务和服务项，并支持统一治理。" />
+                <WrapPanel Margin="0,18,0,0">
+                    <ComboBox Width="280"
+                              ItemsSource="{Binding Apps}"
+                              SelectedItem="{Binding SelectedApp}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding DisplayLabel}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RegistryPath}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Button Content="刷新软件列表" Command="{Binding RefreshAppsCommand}" />
+                    <Button Content="生成全景" Command="{Binding BuildCommand}" />
+                    <Button Style="{StaticResource SecondaryButtonStyle}" Content="启动卸载" Command="{Binding LaunchUninstallCommand}" />
+                    <Button Style="{StaticResource SecondaryButtonStyle}" Content="禁用所选" Command="{Binding DisableSelectedCommand}" />
+                    <Button Style="{StaticResource DangerButtonStyle}" Content="删除所选" Command="{Binding DeleteSelectedCommand}" />
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Margin="0,18,0,0" Background="White">
+            <WrapPanel ItemWidth="560" Orientation="Horizontal">
+                <Border Width="44" Height="44" Background="{StaticResource Brush.AccentSoft}" CornerRadius="14" VerticalAlignment="Top" Margin="0,0,16,12">
+                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="P" FontSize="18" FontWeight="Bold" Foreground="{StaticResource Brush.Accent}" />
+                </Border>
+                <StackPanel Width="560">
+                    <TextBlock Text="软件画像" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource Brush.PrimaryText}" />
+                    <TextBlock Margin="0,6,0,0" Text="{Binding AppNarrative}" TextWrapping="Wrap" Foreground="{StaticResource Brush.PrimaryText}" />
+                </StackPanel>
+            </WrapPanel>
+        </Border>
+
+        <ItemsControl Grid.Row="2" Margin="0,18,0,0" ItemsSource="{Binding SummaryItems}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Width="196"
+                            Margin="0,0,16,16"
+                            Padding="16"
+                            Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CornerRadius="18"
+                            Background="White"
+                            BorderBrush="{Binding Accent}"
+                            BorderThickness="1.5">
+                        <Border.ContextMenu>
+                            <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
+                                <MenuItem Header="打开对应模块"
+                                          Command="{Binding NavigateToRouteCommand}"
+                                          CommandParameter="{Binding PlacementTarget.DataContext.RouteKey, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                            </ContextMenu>
+                        </Border.ContextMenu>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="{StaticResource Brush.PrimaryText}" />
+                            <TextBlock Grid.Row="1" Margin="0,8,0,0" Text="{Binding Description}" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                            <TextBlock Grid.Row="2" Margin="0,14,0,0" Text="{Binding Count}" FontSize="28" FontWeight="Bold" Foreground="{Binding Accent}" />
+                        </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+        <Border Grid.Row="3" Style="{StaticResource CardBorderStyle}" Margin="0,4,0,0" Padding="20,16,20,20">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="治理项明细" />
+                    <TextBlock Margin="0,6,0,0" Text="选中表格行后可执行禁用或删除操作；建议优先处理可逆项，再处理删除类动作。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                </StackPanel>
+
+                <DataGrid Grid.Row="1" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}">
+                <DataGrid.ContextMenu>
+                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                        <MenuItem Header="生成全景" Command="{Binding BuildCommand}" />
+                        <MenuItem Header="启动卸载当前软件" Command="{Binding LaunchUninstallCommand}" />
+                        <Separator />
+                        <MenuItem Header="禁用当前项" Command="{Binding DisableSelectedCommand}" />
+                        <MenuItem Header="删除当前项" Command="{Binding DeleteSelectedCommand}" />
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="类别" Binding="{Binding Category}" Width="*" />
+                    <DataGridTextColumn Header="名称" Binding="{Binding Title}" Width="2*" />
+                    <DataGridTextColumn Header="目标" Binding="{Binding TargetPath}" Width="2*" />
+                    <DataGridTextColumn Header="来源" Binding="{Binding Source}" Width="2*" />
+                    <DataGridTextColumn Header="状态" Binding="{Binding Health}" Width="*" />
+                    <DataGridTextColumn Header="建议" Binding="{Binding Evidence}" Width="2*" />
+                </DataGrid.Columns>
+            </DataGrid>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

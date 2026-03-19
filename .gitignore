@@ -1,0 +1,29 @@
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# VS Code
+.vscode/
+
+# .NET build outputs
+**/bin/
+**/obj/
+**/artifacts/
+artifacts/
+TestResults/
+
+# NuGet
+*.nupkg
+*.snupkg
+
+# Logs and diagnostics
+*.log
+*.tmp
+*.cache
+
+# OS files
+Thumbs.db
+Desktop.ini

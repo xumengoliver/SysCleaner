@@ -1,0 +1,61 @@
+<UserControl x:Class="SysCleaner.Wpf.Views.ContextMenuView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:behaviors="clr-namespace:SysCleaner.Wpf.Behaviors">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource Brush.SurfaceMuted}">
+            <WrapPanel ItemWidth="520" Orientation="Horizontal">
+                <StackPanel Width="520" Margin="0,0,18,12">
+                    <TextBlock Style="{StaticResource PageTitleTextStyle}" Text="右键菜单治理" />
+                    <TextBlock Style="{StaticResource PageSubtitleTextStyle}" Text="扫描命令型右键菜单和常见 Shell 扩展处理器。" />
+                    <Border Style="{StaticResource ChipBorderStyle}" Margin="0,18,0,0" Background="White" HorizontalAlignment="Left">
+                        <TextBlock Text="建议优先禁用异常项，确认不再需要后再删除。" Foreground="{StaticResource Brush.SecondaryText}" />
+                    </Border>
+                </StackPanel>
+                <WrapPanel VerticalAlignment="Top">
+                    <Button Content="刷新" Command="{Binding RefreshCommand}" />
+                    <Button Style="{StaticResource SecondaryButtonStyle}" Content="禁用" Command="{Binding DisableCommand}" />
+                    <Button Style="{StaticResource DangerButtonStyle}" Content="删除" Command="{Binding DeleteCommand}" />
+                </WrapPanel>
+            </WrapPanel>
+        </Border>
+
+        <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Margin="0,18,0,0" Padding="20,16,20,20">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="菜单项列表" />
+                    <TextBlock Margin="0,6,0,0" Text="重点关注指向缺失程序、历史软件残留和右键扩展过多导致的菜单拥挤。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                </StackPanel>
+                <DataGrid Grid.Row="1"
+                          ItemsSource="{Binding Items}"
+                          SelectedItem="{Binding SelectedItem}"
+                          behaviors:DataGridRowSelectionBehavior.DoubleClickCommand="{Binding DisableCommand}">
+                    <DataGrid.ContextMenu>
+                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                            <MenuItem Header="刷新列表" Command="{Binding RefreshCommand}" />
+                            <Separator />
+                            <MenuItem Header="禁用当前菜单项" Command="{Binding DisableCommand}" />
+                            <MenuItem Header="删除当前菜单项" Command="{Binding DeleteCommand}" />
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="名称" Binding="{Binding Title}" Width="2*" />
+                        <DataGridTextColumn Header="目标" Binding="{Binding TargetPath}" Width="2*" />
+                        <DataGridTextColumn Header="来源" Binding="{Binding Source}" Width="2*" />
+                        <DataGridTextColumn Header="状态" Binding="{Binding Health}" Width="*" />
+                        <DataGridTextColumn Header="证据" Binding="{Binding Evidence}" Width="2*" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

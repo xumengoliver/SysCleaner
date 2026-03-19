@@ -1,0 +1,85 @@
+<UserControl x:Class="SysCleaner.Wpf.Views.EmptyCleanupView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource Brush.SurfaceMuted}">
+            <StackPanel>
+                <TextBlock Style="{StaticResource PageTitleTextStyle}" Text="空项清理" />
+                <TextBlock Style="{StaticResource PageSubtitleTextStyle}" Text="扫描空文件、空目录，并在执行时级联删除新变空的父目录。" />
+                <Grid Margin="0,18,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0" Margin="0,0,10,0" Text="{Binding RootPath, UpdateSourceTrigger=PropertyChanged}" />
+                    <Button Grid.Column="1" Style="{StaticResource SecondaryButtonStyle}" Content="选择文件夹" Command="{Binding BrowseRootPathCommand}" />
+                </Grid>
+                <WrapPanel Margin="0,10,0,0">
+                    <Button Content="扫描" Command="{Binding ScanCommand}" />
+                    <Button Style="{StaticResource DangerButtonStyle}" Content="执行删除" Command="{Binding ExecuteCommand}" />
+                </WrapPanel>
+                <Border Style="{StaticResource ChipBorderStyle}" Margin="0,12,0,0" Background="White" HorizontalAlignment="Left">
+                    <TextBlock Text="执行前请检查选中项路径，级联删除会继续移除新变空的父目录。" Foreground="{StaticResource Brush.SecondaryText}" />
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <WrapPanel Grid.Row="1" Margin="0,18,0,0" ItemWidth="520">
+            <Border Width="640" Margin="0,0,18,18" Style="{StaticResource CardBorderStyle}" Padding="20,16,20,20">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="空项候选列表" />
+                        <TextBlock Margin="0,6,0,0" Text="支持勾选后批量执行，适合先扫描再按路径精细确认。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                    </StackPanel>
+                    <DataGrid Grid.Row="1" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}" IsReadOnly="False">
+                        <DataGrid.ContextMenu>
+                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                <MenuItem Header="重新扫描" Command="{Binding ScanCommand}" />
+                                <Separator />
+                                <MenuItem Header="切换当前勾选" Command="{Binding ToggleSelectedItemCommand}" />
+                                <MenuItem Header="仅保留当前项" Command="{Binding SelectOnlyCurrentItemCommand}" />
+                                <MenuItem Header="复制当前路径" Command="{Binding CopySelectedPathCommand}" />
+                                <Separator />
+                                <MenuItem Header="执行删除已勾选项" Command="{Binding ExecuteCommand}" />
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
+                        <DataGrid.Columns>
+                            <DataGridCheckBoxColumn Header="选中" Binding="{Binding IsSelected}" Width="*" />
+                            <DataGridTextColumn Header="名称" Binding="{Binding Candidate.Title}" Width="2*" IsReadOnly="True" />
+                            <DataGridTextColumn Header="路径" Binding="{Binding Candidate.TargetPath}" Width="4*" IsReadOnly="True" />
+                            <DataGridTextColumn Header="类型" Binding="{Binding Candidate.Category}" Width="*" IsReadOnly="True" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </Border>
+
+            <Border Width="380" Margin="0,0,18,18" Style="{StaticResource CardBorderStyle}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="级联删除结果" />
+                    <TextBlock Margin="0,6,0,0" Text="这里展示本次执行后继续变空并被一并删除的目录。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                    <ItemsControl Margin="0,12,0,0" ItemsSource="{Binding CascadeDeleted}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,0,8" Padding="10" Background="White" CornerRadius="12" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                        <TextBlock Margin="0,4,0,0" Text="{Binding TargetPath}" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </WrapPanel>
+    </Grid>
+</UserControl>

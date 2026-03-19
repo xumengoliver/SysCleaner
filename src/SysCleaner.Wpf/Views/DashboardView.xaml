@@ -1,0 +1,195 @@
+<UserControl x:Class="SysCleaner.Wpf.Views.DashboardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Margin="0,0,6,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource Brush.SurfaceMuted}">
+                <WrapPanel ItemWidth="520" Orientation="Horizontal">
+                    <StackPanel Width="520" Margin="0,0,18,12">
+                        <TextBlock Style="{StaticResource PageTitleTextStyle}" Text="概览" />
+                        <TextBlock Style="{StaticResource PageSubtitleTextStyle}" Text="快速查看系统中最值得治理的模块与当前统计，优先识别异常密度最高的区域。" />
+                        <TextBlock Margin="0,18,0,0" Text="{Binding OverviewHeadline}" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource Brush.PrimaryText}" TextWrapping="Wrap" />
+                        <TextBlock Margin="0,8,0,0" Text="{Binding OverviewDetail}" Foreground="{StaticResource Brush.SecondaryText}" TextWrapping="Wrap" />
+                        <Border Style="{StaticResource ChipBorderStyle}" Margin="0,18,0,0" Background="{StaticResource Brush.AccentSoft}" HorizontalAlignment="Left">
+                            <TextBlock Text="先处理高数量且跨模块关联的候选项，可显著减少重复治理。" Foreground="{StaticResource Brush.Accent}" />
+                        </Border>
+                    </StackPanel>
+
+                        <Button Width="120"
+                            Height="42"
+                            Margin="0,0,0,12"
+                            VerticalAlignment="Top"
+                            Content="刷新概览"
+                            Command="{Binding RefreshCommand}" />
+                </WrapPanel>
+            </Border>
+
+            <WrapPanel Grid.Row="1" Margin="0,18,0,0" ItemWidth="260">
+                <Border Width="260" Margin="0,0,18,18" Style="{StaticResource CardBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Text="待治理候选" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource Brush.SecondaryText}" />
+                        <TextBlock Margin="0,12,0,0" Text="{Binding TotalIssueCount}" FontSize="38" FontWeight="Bold" Foreground="{StaticResource Brush.Accent}" />
+                        <TextBlock Margin="0,8,0,0" Text="跨软件、入口、服务和残留模块的当前候选总数。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                    </StackPanel>
+                </Border>
+                <Border Width="260" Margin="0,0,18,18" Style="{StaticResource CardBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Text="最近动作" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource Brush.SecondaryText}" />
+                        <TextBlock Margin="0,12,0,0" Text="{Binding RecentActionCount}" FontSize="38" FontWeight="Bold" Foreground="{StaticResource Brush.Info}" />
+                        <TextBlock Margin="0,8,0,0" Text="首页展示的最新历史动作数量，可用于回看执行结果。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                    </StackPanel>
+                </Border>
+                <Border Width="260" Margin="0,0,18,18" Style="{StaticResource CardBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Text="建议节奏" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource Brush.SecondaryText}" />
+                        <TextBlock Margin="0,12,0,0" Text="先扫描后治理" FontSize="28" FontWeight="Bold" Foreground="{StaticResource Brush.Warning}" />
+                        <TextBlock Margin="0,8,0,0" Text="先做识别和筛选，再执行禁用、删除或修复，能显著降低误操作风险。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                    </StackPanel>
+                </Border>
+            </WrapPanel>
+
+            <ItemsControl Grid.Row="2" Margin="0,4,0,0" ItemsSource="{Binding SummaryItems}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Width="260"
+                                Margin="0,0,18,18"
+                                Padding="20"
+                                Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CornerRadius="22"
+                                Background="White"
+                                BorderBrush="{Binding Accent}"
+                                BorderThickness="1.5"
+                                Effect="{StaticResource Shadow.Card}">
+                            <Border.ContextMenu>
+                                <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
+                                    <MenuItem Header="打开对应模块"
+                                              Command="{Binding NavigateToRouteCommand}"
+                                              CommandParameter="{Binding PlacementTarget.DataContext.RouteKey, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                </ContextMenu>
+                            </Border.ContextMenu>
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <Border Width="58"
+                                    Height="10"
+                                    Background="{Binding Accent}"
+                                    BorderBrush="White"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    HorizontalAlignment="Left" />
+                                <TextBlock Grid.Row="1" Margin="0,16,0,0" Text="{Binding Title}" FontSize="19" FontWeight="SemiBold" Foreground="{StaticResource Brush.PrimaryText}" />
+                                <TextBlock Grid.Row="2" Margin="0,10,0,0" Text="{Binding Description}" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                                <TextBlock Grid.Row="3" Margin="0,18,0,0" Text="{Binding Count}" FontSize="36" FontWeight="Bold" Foreground="{Binding Accent}" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <WrapPanel Grid.Row="3" Margin="0,6,0,0" ItemWidth="460">
+                <Border Width="460" Margin="0,0,18,18" Style="{StaticResource CardBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="优先治理建议" />
+                        <TextBlock Margin="0,6,0,0" Text="根据数量、风险、异常健康和失败动作自动给出建议顺序，适合先决定从哪里开始。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                        <ItemsControl Margin="0,14,0,0" ItemsSource="{Binding Recommendations}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,0,10" Padding="14" Background="White" BorderBrush="{Binding Accent}" BorderThickness="1.5" CornerRadius="14" Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}">
+                                        <Border.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
+                                                <MenuItem Header="打开对应模块"
+                                                          Command="{Binding NavigateToRouteCommand}"
+                                                          CommandParameter="{Binding PlacementTarget.DataContext.RouteKey, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                            </ContextMenu>
+                                        </Border.ContextMenu>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="{StaticResource Brush.PrimaryText}" />
+                                            <WrapPanel Margin="0,8,0,0">
+                                                <Border Style="{StaticResource ChipBorderStyle}" Margin="0,0,8,8" Background="{Binding Accent}">
+                                                    <TextBlock Text="{Binding PriorityLabel}" Foreground="White" FontWeight="SemiBold" />
+                                                </Border>
+                                                <Border Style="{StaticResource ChipBorderStyle}" Margin="0,0,8,8" Background="#FFF7ED">
+                                                    <TextBlock Text="{Binding ReasonLabel}" Foreground="{StaticResource Brush.Warning}" FontWeight="SemiBold" />
+                                                </Border>
+                                                <Border Style="{StaticResource ChipBorderStyle}" Margin="0,0,8,8" Background="White">
+                                                    <TextBlock Text="{Binding StrategyLabel}" Foreground="{StaticResource Brush.SecondaryText}" FontWeight="SemiBold" />
+                                                </Border>
+                                                <Border Style="{StaticResource ChipBorderStyle}" Margin="0,0,8,8" Background="White">
+                                                    <TextBlock Text="{Binding EntryLabel}" Foreground="{StaticResource Brush.SecondaryText}" FontWeight="SemiBold" />
+                                                </Border>
+                                                <Border Style="{StaticResource ChipBorderStyle}" Margin="0,0,8,8" Background="#FEF2F2" Visibility="{Binding RequiresManualConfirmation, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                    <TextBlock Text="需人工确认" Foreground="{StaticResource Brush.Danger}" FontWeight="SemiBold" />
+                                                </Border>
+                                                <Border Style="{StaticResource ChipBorderStyle}" Margin="0,0,8,8" Background="#FFF7ED" Visibility="{Binding PauseRepeatedExecution, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                    <TextBlock Text="暂停重复执行" Foreground="{StaticResource Brush.Warning}" FontWeight="SemiBold" />
+                                                </Border>
+                                            </WrapPanel>
+                                            <TextBlock Margin="0,6,0,0" Text="{Binding Detail}" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <Border Width="460" Margin="0,0,18,18" Style="{StaticResource CardBorderStyle}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="最近操作摘要" />
+                        <TextBlock Margin="0,6,0,0" Text="这里展示最近执行过的动作，便于快速确认清理、卸载和修复结果。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                        <ItemsControl Margin="0,14,0,0" ItemsSource="{Binding RecentEntries}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,0,10" Padding="14" Background="White" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1" CornerRadius="14" Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                        <Border.ContextMenu>
+                                            <ContextMenu DataContext="{Binding PlacementTarget.Tag, RelativeSource={RelativeSource Self}}">
+                                                <MenuItem Header="复制操作详情"
+                                                          Command="{Binding CopyRecentEntryCommand}"
+                                                          CommandParameter="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+                                            </ContextMenu>
+                                        </Border.ContextMenu>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock FontWeight="SemiBold" Foreground="{StaticResource Brush.PrimaryText}">
+                                                    <Run Text="{Binding Module}" />
+                                                    <Run Text=" / " />
+                                                    <Run Text="{Binding Action}" />
+                                                </TextBlock>
+                                                <TextBlock Margin="0,6,0,0" Text="{Binding Target}" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                                                <TextBlock Margin="0,4,0,0" Text="{Binding Details}" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                                            </StackPanel>
+                                            <Border Grid.Column="1" Style="{StaticResource ChipBorderStyle}" Margin="12,0,0,0" VerticalAlignment="Top">
+                                                <TextBlock Text="{Binding Result}" FontWeight="SemiBold" />
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </WrapPanel>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

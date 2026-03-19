@@ -1,0 +1,265 @@
+<UserControl x:Class="SysCleaner.Wpf.Views.UnlockAssistantView"
+             x:Name="Root"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:scm="clr-namespace:System.ComponentModel;assembly=WindowsBase"
+             xmlns:viewModels="clr-namespace:SysCleaner.Wpf.ViewModels"
+             xmlns:behaviors="clr-namespace:SysCleaner.Wpf.Behaviors">
+    <UserControl.Resources>
+        <viewModels:LockKindBadgeBrushConverter x:Key="LockKindBadgeBrushConverter" />
+        <viewModels:RiskLevelBadgeBrushConverter x:Key="RiskLevelBadgeBrushConverter" />
+        <viewModels:LockRecommendedActionTextConverter x:Key="LockRecommendedActionTextConverter" />
+        <viewModels:LockRecommendedActionGlyphConverter x:Key="LockRecommendedActionGlyphConverter" />
+        <Style x:Key="UnlockGridTextStyle" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="TextWrapping" Value="NoWrap" />
+        </Style>
+        <Style x:Key="RecommendedActionButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding CanTerminate}" Value="True">
+                    <Setter Property="Background" Value="{StaticResource Brush.Danger}" />
+                    <Setter Property="Foreground" Value="White" />
+                    <Setter Property="BorderBrush" Value="Transparent" />
+                    <Setter Property="BorderThickness" Value="0" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding ., Converter={StaticResource LockRecommendedActionTextConverter}}" Value="重启资源管理器">
+                    <Setter Property="Background" Value="{StaticResource Brush.Info}" />
+                    <Setter Property="Foreground" Value="White" />
+                    <Setter Property="BorderBrush" Value="Transparent" />
+                    <Setter Property="BorderThickness" Value="0" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <CollectionViewSource x:Key="GroupedLockItems" Source="{Binding LockItems}">
+            <CollectionViewSource.GroupDescriptions>
+                <PropertyGroupDescription PropertyName="TargetPath" />
+            </CollectionViewSource.GroupDescriptions>
+            <CollectionViewSource.SortDescriptions>
+                <scm:SortDescription PropertyName="TargetPath" Direction="Ascending" />
+                <scm:SortDescription PropertyName="HolderName" Direction="Ascending" />
+            </CollectionViewSource.SortDescriptions>
+        </CollectionViewSource>
+    </UserControl.Resources>
+    <Grid behaviors:FileDropBehavior.DropCommand="{Binding AcceptDroppedTargetPathsAsyncCommand}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource Brush.SurfaceMuted}">
+            <StackPanel>
+                <TextBlock Style="{StaticResource PageTitleTextStyle}" Text="解除占用辅助" />
+                <TextBlock Style="{StaticResource PageSubtitleTextStyle}" Text="输入目标文件或目录，识别可能的占用方并提供安全动作。" />
+                <Grid Margin="0,18,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0" Margin="0,0,10,0" Text="{Binding TargetPath, UpdateSourceTrigger=PropertyChanged}" />
+                    <Button Grid.Column="1" Margin="0,0,10,0" Style="{StaticResource SecondaryButtonStyle}" Content="选择文件" Command="{Binding BrowseTargetFileCommand}" />
+                    <Button Grid.Column="2" Style="{StaticResource SecondaryButtonStyle}" Content="选择文件夹" Command="{Binding BrowseTargetFolderCommand}" />
+                </Grid>
+                <WrapPanel Margin="0,10,0,0">
+                    <Button Content="识别占用" Command="{Binding DetectCommand}" />
+                    <Button Style="{StaticResource SecondaryButtonStyle}" Content="关闭进程" Command="{Binding CloseProcessCommand}" />
+                    <Button Style="{StaticResource SecondaryButtonStyle}" Content="重启资源管理器" Command="{Binding RestartExplorerCommand}" />
+                    <Button Style="{StaticResource DangerButtonStyle}" Content="强制删除" Command="{Binding ForceDeleteTargetCommand}" />
+                    <Button Style="{StaticResource WarningButtonStyle}" Content="重启后删除" Command="{Binding ScheduleDeleteCommand}" />
+                </WrapPanel>
+                <Border Style="{StaticResource ChipBorderStyle}" Margin="0,12,0,0" Background="White" HorizontalAlignment="Left">
+                    <TextBlock Text="支持把文件或文件夹直接拖到当前页面快速带入目标；优先使用关闭进程或重启资源管理器。若因高权限或只读属性导致普通删除失败，可改用强制删除；仍被占用时再安排重启后删除。" Foreground="{StaticResource Brush.SecondaryText}" />
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Margin="0,18,0,0" Padding="20,16,20,20">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="占用分析结果" />
+                    <TextBlock Margin="0,6,0,0" Text="识别后重点关注目标分组、进程名、PID 和持有路径；按 Enter 可尝试关闭当前选中进程。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                </StackPanel>
+                <DataGrid Grid.Row="1"
+                          ItemsSource="{Binding Source={StaticResource GroupedLockItems}}"
+                          SelectedItem="{Binding SelectedItem}"
+                          MinColumnWidth="96"
+                          ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                          ScrollViewer.VerticalScrollBarVisibility="Auto"
+                          behaviors:DataGridRowSelectionBehavior.DoubleClickCommand="{Binding CloseProcessCommand}">
+                    <DataGrid.InputBindings>
+                        <KeyBinding Key="Enter" Command="{Binding CloseProcessCommand}" />
+                    </DataGrid.InputBindings>
+                    <DataGrid.ContextMenu>
+                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                            <MenuItem Header="重新识别占用" Command="{Binding DetectCommand}" />
+                            <Separator />
+                            <MenuItem Header="关闭当前进程" Command="{Binding CloseProcessCommand}" />
+                            <MenuItem Header="重启资源管理器" Command="{Binding RestartExplorerCommand}" />
+                            <MenuItem Header="强制删除当前目标" Command="{Binding ForceDeleteTargetCommand}" />
+                            <MenuItem Header="安排重启后删除" Command="{Binding ScheduleDeleteCommand}" />
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
+                    <DataGrid.GroupStyle>
+                        <GroupStyle>
+                            <GroupStyle.ContainerStyle>
+                                <Style TargetType="GroupItem">
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="GroupItem">
+                                                <Expander IsExpanded="True" Background="Transparent" BorderThickness="0">
+                                                    <Expander.Header>
+                                                        <ContentPresenter Content="{TemplateBinding Content}" />
+                                                    </Expander.Header>
+                                                    <ItemsPresenter />
+                                                </Expander>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </GroupStyle.ContainerStyle>
+                            <GroupStyle.HeaderTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,10,0,4" Padding="12,8" CornerRadius="12" Background="{StaticResource Brush.SurfaceMuted}">
+                                        <StackPanel>
+                                            <TextBlock FontSize="16" FontWeight="SemiBold">
+                                                <Run Text="目标：" />
+                                                <Run Text="{Binding Name}" />
+                                                <Run Text="（" />
+                                                <Run Text="{Binding ItemCount}" />
+                                                <Run Text=" 项）" />
+                                            </TextBlock>
+                                            <TextBlock Margin="0,4,0,0" Foreground="{StaticResource Brush.SecondaryText}" Text="该分组展示当前目标路径下识别到的占用方，便于逐个处理。" TextWrapping="Wrap" />
+                                            <WrapPanel Margin="0,8,0,0">
+                                                <Button Style="{StaticResource SecondaryButtonStyle}"
+                                                        Padding="10,6"
+                                                        Content="复制目标路径"
+                                                        Command="{Binding DataContext.CopyGroupTargetPathCommand, ElementName=Root}"
+                                                        CommandParameter="{Binding Name}" />
+                                                <Button Style="{StaticResource SecondaryButtonStyle}"
+                                                        Padding="10,6"
+                                                        Content="重新识别该组"
+                                                        Command="{Binding DataContext.DetectGroupTargetCommand, ElementName=Root}"
+                                                        CommandParameter="{Binding Name}" />
+                                                <Button Style="{StaticResource DangerButtonStyle}"
+                                                        Padding="10,6"
+                                                        Content="关闭首个可关闭项"
+                                                        Command="{Binding DataContext.CloseFirstTerminableInGroupCommand, ElementName=Root}"
+                                                        CommandParameter="{Binding Name}" />
+                                                <Button Style="{StaticResource DangerButtonStyle}"
+                                                        Padding="10,6"
+                                                        Content="强制删除该目标"
+                                                        Command="{Binding DataContext.ForceDeleteTargetCommand, ElementName=Root}"
+                                                        CommandParameter="{Binding Name}" />
+                                            </WrapPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </GroupStyle.HeaderTemplate>
+                        </GroupStyle>
+                    </DataGrid.GroupStyle>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="占用方"
+                                            Binding="{Binding HolderName}"
+                                            Width="220"
+                                            ElementStyle="{StaticResource UnlockGridTextStyle}" />
+                        <DataGridTextColumn Header="PID"
+                                            Binding="{Binding ProcessId}"
+                                            Width="80"
+                                            ElementStyle="{StaticResource UnlockGridTextStyle}" />
+                        <DataGridTextColumn Header="路径"
+                                            Binding="{Binding HolderPath}"
+                                            Width="320"
+                                            ElementStyle="{StaticResource UnlockGridTextStyle}" />
+                        <DataGridTemplateColumn Header="类型" Width="120">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border HorizontalAlignment="Left"
+                                            Padding="10,4"
+                                            Background="{Binding Kind, Converter={StaticResource LockKindBadgeBrushConverter}}"
+                                            CornerRadius="10">
+                                        <TextBlock Text="{Binding Kind}" Foreground="{StaticResource Brush.PrimaryText}" />
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="风险" Width="120">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Border HorizontalAlignment="Left"
+                                            Padding="10,4"
+                                            Background="{Binding Risk, Converter={StaticResource RiskLevelBadgeBrushConverter}}"
+                                            CornerRadius="10">
+                                        <TextBlock Text="{Binding Risk}" Foreground="{StaticResource Brush.PrimaryText}" />
+                                    </Border>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="建议动作" Width="280">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel MaxWidth="260">
+                                        <Button HorizontalAlignment="Left"
+                                                Style="{StaticResource RecommendedActionButtonStyle}"
+                                                Padding="10,6"
+                                                Command="{Binding DataContext.RunRecommendedActionCommand, ElementName=Root}"
+                                                CommandParameter="{Binding}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Style="{StaticResource ActionGlyphTextStyle}"
+                                                           Text="{Binding ., Converter={StaticResource LockRecommendedActionGlyphConverter}}" />
+                                                <TextBlock Margin="8,0,0,0"
+                                                           Text="{Binding ., Converter={StaticResource LockRecommendedActionTextConverter}}" />
+                                            </StackPanel>
+                                        </Button>
+                                        <TextBlock Margin="0,6,0,0"
+                                                   Foreground="{StaticResource Brush.SecondaryText}"
+                                                   Text="{Binding Recommendation}"
+                                                   TextWrapping="Wrap"
+                                                   LineHeight="18"
+                                                   MaxHeight="36"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+
+        <Border Grid.RowSpan="2"
+                Background="#DCEFEB"
+                BorderBrush="{StaticResource Brush.Accent}"
+                BorderThickness="2"
+                CornerRadius="24"
+                Opacity="0.94"
+                IsHitTestVisible="False"
+                Visibility="{Binding RelativeSource={RelativeSource AncestorType=Grid}, Path=(behaviors:FileDropBehavior.IsDragActive), Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid>
+                <Border HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Padding="22,14"
+                        Background="White"
+                        BorderBrush="{StaticResource Brush.Accent}"
+                        BorderThickness="1"
+                        CornerRadius="14">
+                    <StackPanel>
+                        <TextBlock HorizontalAlignment="Center"
+                                   FontSize="22"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource Brush.PrimaryText}"
+                                   Text="释放以快速识别占用" />
+                        <TextBlock Margin="0,6,0,0"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{StaticResource Brush.SecondaryText}"
+                                   Text="支持文件和文件夹，放下后会自动填充目标并开始识别。" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

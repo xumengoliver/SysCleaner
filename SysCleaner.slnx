@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SysCleaner.Application/SysCleaner.Application.csproj" />
+    <Project Path="src/SysCleaner.Contracts/SysCleaner.Contracts.csproj" />
+    <Project Path="src/SysCleaner.Domain/SysCleaner.Domain.csproj" />
+    <Project Path="src/SysCleaner.Infrastructure/SysCleaner.Infrastructure.csproj" />
+    <Project Path="src/SysCleaner.Wpf/SysCleaner.Wpf.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SysCleaner.Tests/SysCleaner.Tests.csproj" />
+  </Folder>
+</Solution>

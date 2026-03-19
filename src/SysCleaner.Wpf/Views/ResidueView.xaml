@@ -1,0 +1,66 @@
+<UserControl x:Class="SysCleaner.Wpf.Views.ResidueView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:behaviors="clr-namespace:SysCleaner.Wpf.Behaviors">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource Brush.SurfaceMuted}">
+            <WrapPanel ItemWidth="520" Orientation="Horizontal">
+                <StackPanel Width="520" Margin="0,0,18,12">
+                    <TextBlock Style="{StaticResource PageTitleTextStyle}" Text="残留清理候选" />
+                    <TextBlock Style="{StaticResource PageSubtitleTextStyle}" Text="基于安装目录、AppData、ProgramData 等常见位置识别残留。" />
+                    <WrapPanel Margin="0,18,0,0">
+                        <ComboBox Width="280" ItemsSource="{Binding Apps}" SelectedItem="{Binding SelectedApp}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding DisplayLabel}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RegistryPath}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <Button Content="刷新软件" Command="{Binding RefreshAppsCommand}" />
+                        <Button Content="扫描残留" Command="{Binding ScanCommand}" />
+                        <Button Style="{StaticResource DangerButtonStyle}" Content="删除选中项" Command="{Binding DeleteSelectedCommand}" />
+                    </WrapPanel>
+                    <Border Style="{StaticResource ChipBorderStyle}" Margin="0,12,0,0" Background="White" HorizontalAlignment="Left">
+                        <TextBlock Text="对用户目录和共享目录中的候选项，建议先确认路径归属再删除。" Foreground="{StaticResource Brush.SecondaryText}" />
+                    </Border>
+                </StackPanel>
+            </WrapPanel>
+        </Border>
+
+        <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Margin="0,18,0,0" Padding="20,16,20,20">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="残留列表" />
+                    <TextBlock Margin="0,6,0,0" Text="优先处理高置信度、路径明确且风险较低的残留项。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                </StackPanel>
+                <DataGrid Grid.Row="1"
+                          ItemsSource="{Binding Items}"
+                          SelectedItem="{Binding SelectedItem}"
+                          behaviors:DataGridRowSelectionBehavior.DoubleClickCommand="{Binding DeleteSelectedCommand}">
+                    <DataGrid.ContextMenu>
+                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                            <MenuItem Header="扫描残留" Command="{Binding ScanCommand}" />
+                            <Separator />
+                            <MenuItem Header="删除当前残留项" Command="{Binding DeleteSelectedCommand}" />
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="名称" Binding="{Binding Title}" Width="2*" />
+                        <DataGridTextColumn Header="路径" Binding="{Binding TargetPath}" Width="3*" />
+                        <DataGridTextColumn Header="证据" Binding="{Binding Evidence}" Width="2*" />
+                        <DataGridTextColumn Header="风险" Binding="{Binding Risk}" Width="*" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

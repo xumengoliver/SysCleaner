@@ -1,0 +1,105 @@
+<UserControl x:Class="SysCleaner.Wpf.Views.RegistryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:scm="clr-namespace:System.ComponentModel;assembly=WindowsBase"
+             xmlns:viewModels="clr-namespace:SysCleaner.Wpf.ViewModels">
+    <UserControl.Resources>
+        <viewModels:RegistryGroupRiskDescriptionConverter x:Key="RegistryGroupRiskDescriptionConverter" />
+        <viewModels:RegistryConfidenceConverter x:Key="RegistryConfidenceConverter" />
+        <CollectionViewSource x:Key="GroupedRegistryItems" Source="{Binding Items}">
+            <CollectionViewSource.GroupDescriptions>
+                <PropertyGroupDescription PropertyName="Source" />
+            </CollectionViewSource.GroupDescriptions>
+            <CollectionViewSource.SortDescriptions>
+                <scm:SortDescription PropertyName="Source" Direction="Ascending" />
+                <scm:SortDescription PropertyName="Title" Direction="Ascending" />
+            </CollectionViewSource.SortDescriptions>
+        </CollectionViewSource>
+    </UserControl.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource CardBorderStyle}" Background="{StaticResource Brush.SurfaceMuted}">
+            <StackPanel>
+                <TextBlock Style="{StaticResource PageTitleTextStyle}" Text="注册表清理候选" />
+                <TextBlock Style="{StaticResource PageSubtitleTextStyle}" Text="支持两种模式：按软件扫描关联项，或全局扫描常见分支中的失效注册表项。" />
+                <Border Style="{StaticResource CardBorderStyle}" Margin="0,12,0,0" Padding="16" Background="White">
+                    <TextBlock Text="全局扫描当前覆盖启动项、App Paths、右键命令和 Shell 扩展处理器等常见分支，优先识别指向缺失程序或缺失 COM 组件的值或键；按软件扫描则用于定向治理某个软件留下的注册表项。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                </Border>
+                <WrapPanel Margin="0,18,0,0">
+                    <ComboBox Width="280" ItemsSource="{Binding Apps}" SelectedItem="{Binding SelectedApp}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding DisplayLabel}" TextTrimming="CharacterEllipsis" ToolTip="{Binding RegistryPath}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Button Content="刷新软件" Command="{Binding RefreshAppsCommand}" />
+                    <Button Content="按软件扫描" Command="{Binding ScanCommand}" />
+                    <Button Style="{StaticResource SecondaryButtonStyle}" Content="全局扫描失效项" Command="{Binding ScanBrokenEntriesCommand}" />
+                    <Button Style="{StaticResource DangerButtonStyle}" Content="删除选中项" Command="{Binding DeleteSelectedCommand}" />
+                </WrapPanel>
+                <WrapPanel Margin="0,8,0,0">
+                    <CheckBox IsChecked="{Binding ShowOnlyHighConfidence}" Content="仅显示高置信度坏项" />
+                </WrapPanel>
+                <WrapPanel Margin="0,8,0,0">
+                    <ComboBox Width="220" ItemsSource="{Binding AvailableSources}" SelectedItem="{Binding SelectedSource}" />
+                    <Button Style="{StaticResource WarningButtonStyle}" Content="清理所选分组" Command="{Binding DeleteSelectedSourceCommand}" />
+                </WrapPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Margin="0,18,0,0" Padding="20,16,20,20">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="注册表候选列表" />
+                    <TextBlock Margin="0,6,0,0" Text="删除前请重点核对来源分组、目标路径和证据说明；分组可以帮助快速识别同类问题。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                </StackPanel>
+                <DataGrid Grid.Row="1" ItemsSource="{Binding Source={StaticResource GroupedRegistryItems}}" SelectedItem="{Binding SelectedItem}">
+                    <DataGrid.ContextMenu>
+                        <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                            <MenuItem Header="按软件扫描" Command="{Binding ScanCommand}" />
+                            <MenuItem Header="全局扫描失效项" Command="{Binding ScanBrokenEntriesCommand}" />
+                            <Separator />
+                            <MenuItem Header="删除当前注册表项" Command="{Binding DeleteSelectedCommand}" />
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
+                    <DataGrid.GroupStyle>
+                        <GroupStyle>
+                            <GroupStyle.HeaderTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,10,0,4" Padding="12,8" CornerRadius="12" Background="{StaticResource Brush.SurfaceMuted}">
+                                        <StackPanel>
+                                            <TextBlock FontSize="16" FontWeight="SemiBold">
+                                                <Run Text="{Binding Name}" />
+                                                <Run Text="（" />
+                                                <Run Text="{Binding ItemCount}" />
+                                                <Run Text=" 项）" />
+                                            </TextBlock>
+                                            <TextBlock Margin="0,4,0,0" Foreground="{StaticResource Brush.SecondaryText}" TextWrapping="Wrap" Text="{Binding Name, Converter={StaticResource RegistryGroupRiskDescriptionConverter}}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </GroupStyle.HeaderTemplate>
+                        </GroupStyle>
+                    </DataGrid.GroupStyle>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="名称" Binding="{Binding Title}" Width="2*" />
+                        <DataGridTextColumn Header="置信度" Binding="{Binding ., Converter={StaticResource RegistryConfidenceConverter}}" Width="*" />
+                        <DataGridTextColumn Header="位置" Binding="{Binding TargetPath}" Width="3*" />
+                        <DataGridTextColumn Header="来源" Binding="{Binding Source}" Width="2*" />
+                        <DataGridTextColumn Header="证据" Binding="{Binding Evidence}" Width="2*" />
+                        <DataGridTextColumn Header="风险" Binding="{Binding Risk}" Width="*" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>
