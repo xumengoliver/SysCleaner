@@ -23,7 +23,11 @@ The project is designed around one core principle: preview first, execute second
 
 ## Preview
 
-The repository currently includes the project logo as the visual preview asset used on the repository homepage. UI views already implemented in the WPF client include:
+Main window snapshot from the current WPF build:
+
+![SysCleaner Main Window](assets/screenshots/main-window.png)
+
+UI views already implemented in the WPF client include:
 
 - Dashboard
 - Installed apps
@@ -65,6 +69,39 @@ dotnet run --project src/SysCleaner.Wpf/SysCleaner.Wpf.csproj
 ```
 
 The WPF app is configured to request administrator privileges through its manifest because several cleanup and diagnostic operations require elevation.
+
+## Release And Publish
+
+### Build Release binaries
+
+```powershell
+dotnet build SysCleaner.slnx -c Release
+```
+
+### Publish a framework-dependent package
+
+```powershell
+dotnet publish src/SysCleaner.Wpf/SysCleaner.Wpf.csproj -c Release -r win-x64 --self-contained false
+```
+
+Typical output directory:
+
+```text
+src/SysCleaner.Wpf/bin/Release/net8.0-windows/win-x64/publish/
+```
+
+### Publish a self-contained package
+
+```powershell
+dotnet publish src/SysCleaner.Wpf/SysCleaner.Wpf.csproj -c Release -r win-x64 --self-contained true
+```
+
+### Packaging notes
+
+- The application currently publishes as a standard WPF executable layout.
+- The app manifest requests administrator privileges at startup.
+- A dedicated MSIX or installer project is not currently configured in this repository snapshot.
+- For internal distribution, the publish output can be zipped and distributed directly.
 
 ## Usage Flow
 
