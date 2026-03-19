@@ -6,5 +6,6 @@ namespace SysCleaner.Contracts.Interfaces;
 public interface IServiceControlService
 {
     Task<IReadOnlyList<CleanupCandidate>> GetServicesAsync(CancellationToken cancellationToken = default);
+    Task<OperationResult> StopAsync(string serviceName, CancellationToken cancellationToken = default);
     Task<OperationResult> DeleteAsync(CleanupCandidate candidate, CancellationToken cancellationToken = default);
 }

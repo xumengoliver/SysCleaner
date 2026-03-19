@@ -6,7 +6,7 @@ using System.Diagnostics;
 
 namespace SysCleaner.Infrastructure.Services;
 
-public sealed class UnlockAssistanceService(IHistoryService historyService) : IUnlockAssistanceService
+public sealed class UnlockAssistanceService(IHistoryService historyService, IServiceControlService serviceControlService) : IUnlockAssistanceService
 {
     public async Task<OperationResult> CloseProcessAsync(LockInfo lockInfo, CancellationToken cancellationToken = default)
     {
@@ -18,9 +18,38 @@ public sealed class UnlockAssistanceService(IHistoryService historyService) : IU
         try
         {
             using var process = Process.GetProcessById(lockInfo.ProcessId);
-            process.Kill(entireProcessTree: true);
-            await historyService.LogAsync(new OperationLogEntry(0, DateTime.Now, "Unlock", "CloseProcess", lockInfo.HolderName, "Success", lockInfo.HolderPath), cancellationToken);
-            return new OperationResult(true, "已尝试关闭占用进程。");
+            var usedGracefulClose = false;
+            if (process.MainWindowHandle != IntPtr.Zero)
+            {
+                try
+                {
+                    usedGracefulClose = process.CloseMainWindow();
+                    if (usedGracefulClose)
+                    {
+                        var exited = await WaitForExitAsync(process, TimeSpan.FromSeconds(3), cancellationToken);
+                        if (!exited)
+                        {
+                            process.Kill(entireProcessTree: true);
+                        }
+                    }
+                    else
+                    {
+                        process.Kill(entireProcessTree: true);
+                    }
+                }
+                catch
+                {
+                    process.Kill(entireProcessTree: true);
+                }
+            }
+            else
+            {
+                process.Kill(entireProcessTree: true);
+            }
+
+            var message = usedGracefulClose ? "已尝试优雅关闭占用进程，必要时已升级为强制结束。" : "已尝试结束占用进程。";
+            await historyService.LogAsync(new OperationLogEntry(0, DateTime.Now, "Unlock", "CloseProcess", lockInfo.HolderName, "Success", message), cancellationToken);
+            return new OperationResult(true, message);
         }
         catch (Exception ex)
         {
@@ -74,5 +103,47 @@ public sealed class UnlockAssistanceService(IHistoryService historyService) : IU
             await historyService.LogAsync(new OperationLogEntry(0, DateTime.Now, "Unlock", "ScheduleDeleteOnReboot", targetPath, "Failed", ex.Message), cancellationToken);
             return new OperationResult(false, ex.Message);
         }
+    }
+
+    public Task<OperationResult> StopServiceAsync(LockInfo lockInfo, CancellationToken cancellationToken = default)
+    {
+        if (!lockInfo.CanStopService || lockInfo.Risk == RiskLevel.Protected)
+        {
+            return Task.FromResult(new OperationResult(false, "该占用项不允许直接停止服务。"));
+        }
+
+        var serviceName = ResolveServiceName(lockInfo);
+        if (string.IsNullOrWhiteSpace(serviceName))
+        {
+            return Task.FromResult(new OperationResult(false, "未识别到服务名，无法停止服务。"));
+        }
+
+        return serviceControlService.StopAsync(serviceName, cancellationToken);
+    }
+
+    private static async Task<bool> WaitForExitAsync(Process process, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var waitTask = process.WaitForExitAsync(linkedCts.Token);
+        var delayTask = Task.Delay(timeout, linkedCts.Token);
+        var completedTask = await Task.WhenAny(waitTask, delayTask);
+        if (completedTask == waitTask)
+        {
+            linkedCts.Cancel();
+            await waitTask;
+            return true;
+        }
+
+        return process.HasExited;
+    }
+
+    private static string ResolveServiceName(LockInfo lockInfo)
+    {
+        if (!string.IsNullOrWhiteSpace(lockInfo.Notes))
+        {
+            return lockInfo.Notes.Trim();
+        }
+
+        return string.Empty;
     }
 }

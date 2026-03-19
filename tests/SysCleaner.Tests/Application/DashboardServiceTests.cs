@@ -131,6 +131,8 @@ public sealed class DashboardServiceTests
                 new CleanupCandidate("svc-2", CleanupCategory.Service, "残留服务", @"C:\Missing\svc.exe", "服务名：GhostSvc", "目标缺失", ItemHealth.Broken, RiskLevel.Review, false, true, false)
             ]);
 
+        public Task<OperationResult> StopAsync(string serviceName, CancellationToken cancellationToken = default) => Task.FromResult(new OperationResult(true, "ok"));
+
         public Task<OperationResult> DeleteAsync(CleanupCandidate candidate, CancellationToken cancellationToken = default) => Task.FromResult(new OperationResult(true, "ok"));
     }
 

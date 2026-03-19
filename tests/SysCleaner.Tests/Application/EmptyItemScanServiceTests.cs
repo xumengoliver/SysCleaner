@@ -1,4 +1,5 @@
 using SysCleaner.Contracts.Interfaces;
+using SysCleaner.Contracts.Models;
 using SysCleaner.Domain.Models;
 using SysCleaner.Infrastructure.Services;
 
@@ -56,6 +57,37 @@ public sealed class EmptyItemScanServiceTests
         Assert.DoesNotContain(results, x => x.TargetPath == emptyFile);
         Assert.DoesNotContain(results, x => x.TargetPath == child.FullName);
         Assert.DoesNotContain(results, x => x.TargetPath == parent.FullName);
+    }
+
+    [Fact]
+    public void ShouldSkipScanPath_AllowsProtectedRootWhenItIsSelectedScanRoot()
+    {
+        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        var shouldSkipRoot = EmptyItemScanService.ShouldSkipScanPath(userProfile, userProfile);
+        var shouldSkipChild = EmptyItemScanService.ShouldSkipScanPath(userProfile, Path.Combine(userProfile, "Documents"));
+
+        Assert.False(shouldSkipRoot);
+        Assert.False(shouldSkipChild);
+    }
+
+    [Fact]
+    public async Task ScanAsync_StopsAtConfiguredResultLimit()
+    {
+        using var fixture = new TempDirectoryFixture();
+        for (var index = 0; index < 10; index++)
+        {
+            File.WriteAllText(Path.Combine(fixture.RootPath, $"empty-{index}.txt"), string.Empty);
+        }
+
+        var progressEvents = new List<EmptyItemScanProgress>();
+        var progress = new Progress<EmptyItemScanProgress>(item => progressEvents.Add(item));
+        var service = new EmptyItemScanService(new FakeHistoryService());
+
+        var results = await service.ScanAsync(fixture.RootPath, includeSubfolders: true, maxResults: 3, progress: progress);
+
+        Assert.Equal(3, results.Count);
+        Assert.Contains(progressEvents, item => item.ReachedResultLimit);
     }
 
     [Fact]

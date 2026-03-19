@@ -23,6 +23,12 @@
                     <Setter Property="BorderBrush" Value="Transparent" />
                     <Setter Property="BorderThickness" Value="0" />
                 </DataTrigger>
+                <DataTrigger Binding="{Binding ., Converter={StaticResource LockRecommendedActionTextConverter}}" Value="停止服务">
+                    <Setter Property="Background" Value="{StaticResource Brush.Warning}" />
+                    <Setter Property="Foreground" Value="White" />
+                    <Setter Property="BorderBrush" Value="Transparent" />
+                    <Setter Property="BorderThickness" Value="0" />
+                </DataTrigger>
                 <DataTrigger Binding="{Binding ., Converter={StaticResource LockRecommendedActionTextConverter}}" Value="重启资源管理器">
                     <Setter Property="Background" Value="{StaticResource Brush.Info}" />
                     <Setter Property="Foreground" Value="White" />
@@ -64,12 +70,13 @@
                 <WrapPanel Margin="0,10,0,0">
                     <Button Content="识别占用" Command="{Binding DetectCommand}" />
                     <Button Style="{StaticResource SecondaryButtonStyle}" Content="关闭进程" Command="{Binding CloseProcessCommand}" />
+                    <Button Style="{StaticResource SecondaryButtonStyle}" Content="停止服务" Command="{Binding StopServiceCommand}" />
                     <Button Style="{StaticResource SecondaryButtonStyle}" Content="重启资源管理器" Command="{Binding RestartExplorerCommand}" />
                     <Button Style="{StaticResource DangerButtonStyle}" Content="强制删除" Command="{Binding ForceDeleteTargetCommand}" />
                     <Button Style="{StaticResource WarningButtonStyle}" Content="重启后删除" Command="{Binding ScheduleDeleteCommand}" />
                 </WrapPanel>
                 <Border Style="{StaticResource ChipBorderStyle}" Margin="0,12,0,0" Background="White" HorizontalAlignment="Left">
-                    <TextBlock Text="支持把文件或文件夹直接拖到当前页面快速带入目标；优先使用关闭进程或重启资源管理器。若因高权限或只读属性导致普通删除失败，可改用强制删除；仍被占用时再安排重启后删除。" Foreground="{StaticResource Brush.SecondaryText}" />
+                    <TextBlock Text="支持把文件或文件夹直接拖到当前页面快速带入目标；系统会按类型推荐关闭进程、停止服务或重启资源管理器，并在执行后自动复检。若因高权限或只读属性导致普通删除失败，可改用强制删除；仍被占用时再安排重启后删除。" Foreground="{StaticResource Brush.SecondaryText}" />
                 </Border>
             </StackPanel>
         </Border>
@@ -82,7 +89,7 @@
                 </Grid.RowDefinitions>
                 <StackPanel>
                     <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="占用分析结果" />
-                    <TextBlock Margin="0,6,0,0" Text="识别后重点关注目标分组、进程名、PID 和持有路径；按 Enter 可尝试关闭当前选中进程。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                    <TextBlock Margin="0,6,0,0" Text="识别后重点关注目标分组、进程名、PID 和持有路径；按 Enter 或双击可执行当前项的推荐动作。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
                 </StackPanel>
                 <DataGrid Grid.Row="1"
                           ItemsSource="{Binding Source={StaticResource GroupedLockItems}}"
@@ -90,15 +97,18 @@
                           MinColumnWidth="96"
                           ScrollViewer.HorizontalScrollBarVisibility="Auto"
                           ScrollViewer.VerticalScrollBarVisibility="Auto"
-                          behaviors:DataGridRowSelectionBehavior.DoubleClickCommand="{Binding CloseProcessCommand}">
+                          behaviors:DataGridRowSelectionBehavior.DoubleClickCommand="{Binding RunRecommendedActionCommand}">
                     <DataGrid.InputBindings>
-                        <KeyBinding Key="Enter" Command="{Binding CloseProcessCommand}" />
+                        <KeyBinding Key="Enter"
+                                    Command="{Binding RunRecommendedActionCommand}"
+                                    CommandParameter="{Binding SelectedItem, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
                     </DataGrid.InputBindings>
                     <DataGrid.ContextMenu>
                         <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
                             <MenuItem Header="重新识别占用" Command="{Binding DetectCommand}" />
                             <Separator />
                             <MenuItem Header="关闭当前进程" Command="{Binding CloseProcessCommand}" />
+                            <MenuItem Header="停止当前服务" Command="{Binding StopServiceCommand}" />
                             <MenuItem Header="重启资源管理器" Command="{Binding RestartExplorerCommand}" />
                             <MenuItem Header="强制删除当前目标" Command="{Binding ForceDeleteTargetCommand}" />
                             <MenuItem Header="安排重启后删除" Command="{Binding ScheduleDeleteCommand}" />
@@ -145,10 +155,10 @@
                                                         Content="重新识别该组"
                                                         Command="{Binding DataContext.DetectGroupTargetCommand, ElementName=Root}"
                                                         CommandParameter="{Binding Name}" />
-                                                <Button Style="{StaticResource DangerButtonStyle}"
+                                                <Button Style="{StaticResource SecondaryButtonStyle}"
                                                         Padding="10,6"
-                                                        Content="关闭首个可关闭项"
-                                                        Command="{Binding DataContext.CloseFirstTerminableInGroupCommand, ElementName=Root}"
+                                                    Content="执行首个推荐动作"
+                                                    Command="{Binding DataContext.ExecutePrimaryActionInGroupCommand, ElementName=Root}"
                                                         CommandParameter="{Binding Name}" />
                                                 <Button Style="{StaticResource DangerButtonStyle}"
                                                         Padding="10,6"

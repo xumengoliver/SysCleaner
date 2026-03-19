@@ -139,6 +139,8 @@ public sealed class SoftwarePanoramaServiceTests
     {
         public Task<IReadOnlyList<CleanupCandidate>> GetServicesAsync(CancellationToken cancellationToken = default) => Task.FromResult(items);
 
+        public Task<OperationResult> StopAsync(string serviceName, CancellationToken cancellationToken = default) => Task.FromResult(new OperationResult(true, "ok"));
+
         public Task<OperationResult> DeleteAsync(CleanupCandidate candidate, CancellationToken cancellationToken = default) => Task.FromResult(new OperationResult(true, "ok"));
     }
 }

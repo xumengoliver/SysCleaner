@@ -395,6 +395,16 @@ public sealed class LockRecommendedActionTextConverter : IValueConverter
             return "查看建议";
         }
 
+        if (item.Kind == LockKind.Shell)
+        {
+            return "重启资源管理器";
+        }
+
+        if (item.CanStopService)
+        {
+            return "停止服务";
+        }
+
         if (item.CanTerminate)
         {
             return "关闭进程";
@@ -402,7 +412,6 @@ public sealed class LockRecommendedActionTextConverter : IValueConverter
 
         return item.Kind switch
         {
-            LockKind.Shell => "重启资源管理器",
             LockKind.Service => "查看服务建议",
             LockKind.Protected => "查看保护提示",
             _ => "查看建议"
@@ -421,6 +430,16 @@ public sealed class LockRecommendedActionGlyphConverter : IValueConverter
             return "\uE946";
         }
 
+        if (item.Kind == LockKind.Shell)
+        {
+            return "\uE72C";
+        }
+
+        if (item.CanStopService)
+        {
+            return "\uE895";
+        }
+
         if (item.CanTerminate)
         {
             return "\uE74D";
@@ -428,7 +447,6 @@ public sealed class LockRecommendedActionGlyphConverter : IValueConverter
 
         return item.Kind switch
         {
-            LockKind.Shell => "\uE72C",
             LockKind.Service => "\uE895",
             LockKind.Protected => "\uE72E",
             _ => "\uE946"

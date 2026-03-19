@@ -704,6 +704,14 @@ public sealed partial class ContextMenuViewModel(IContextMenuService service) : 
 
 public sealed partial class UnlockAssistantViewModel(ILockDetectionService detectionService, IUnlockAssistanceService unlockService) : ViewModelBase, IInitializable
 {
+    private static readonly string[] SensitiveDeleteRoots =
+    [
+        Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+        Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+        Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+    ];
+
     public ObservableCollection<LockInfo> LockItems { get; } = [];
 
     [ObservableProperty]
@@ -799,7 +807,18 @@ public sealed partial class UnlockAssistantViewModel(ILockDetectionService detec
     }
 
     [RelayCommand]
-    private async Task CloseFirstTerminableInGroupAsync(string? targetPath)
+    private async Task StopServiceAsync()
+    {
+        if (SelectedItem is null)
+        {
+            return;
+        }
+
+        await StopServiceItemAsync(SelectedItem);
+    }
+
+    [RelayCommand]
+    private async Task ExecutePrimaryActionInGroupAsync(string? targetPath)
     {
         if (string.IsNullOrWhiteSpace(targetPath))
         {
@@ -807,26 +826,18 @@ public sealed partial class UnlockAssistantViewModel(ILockDetectionService detec
             return;
         }
 
-        var candidate = LockItems.FirstOrDefault(item => string.Equals(item.TargetPath, targetPath, StringComparison.OrdinalIgnoreCase) && item.CanTerminate);
+        var candidate = LockItems
+            .Where(item => string.Equals(item.TargetPath, targetPath, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(GetRecommendedActionPriority)
+            .FirstOrDefault();
         if (candidate is null)
         {
-            var sample = LockItems.FirstOrDefault(item => string.Equals(item.TargetPath, targetPath, StringComparison.OrdinalIgnoreCase));
-            if (sample is not null)
-            {
-                var blocked = BuildCloseProcessBlockedMessage(sample);
-                ShowNotice(blocked.Title, blocked.Message, blocked.Icon);
-                StatusMessage = $"分组“{targetPath}”中没有可直接关闭的占用进程。";
-            }
-            else
-            {
-                StatusMessage = "当前分组没有可直接关闭的占用进程。";
-            }
-
+            StatusMessage = "当前分组没有可执行的推荐动作。";
             return;
         }
 
         SelectedItem = candidate;
-        await CloseProcessItemAsync(candidate);
+        await RunRecommendedActionAsync(candidate);
     }
 
     [RelayCommand]
@@ -839,15 +850,21 @@ public sealed partial class UnlockAssistantViewModel(ILockDetectionService detec
 
         SelectedItem = item;
 
-        if (item.CanTerminate)
+        if (item.Kind == SysCleaner.Domain.Enums.LockKind.Shell)
         {
-            await CloseProcessItemAsync(item);
+            await RestartExplorerAsync(item.TargetPath);
             return;
         }
 
-        if (item.Kind == SysCleaner.Domain.Enums.LockKind.Shell)
+        if (item.CanStopService)
         {
-            await RestartExplorerAsync();
+            await StopServiceItemAsync(item);
+            return;
+        }
+
+        if (item.CanTerminate)
+        {
+            await CloseProcessItemAsync(item);
             return;
         }
 
@@ -879,13 +896,48 @@ public sealed partial class UnlockAssistantViewModel(ILockDetectionService detec
         }
 
         var result = await RunBusyAsync($"正在关闭占用进程：{item.HolderName}", () => unlockService.CloseProcessAsync(item));
-        StatusMessage = result.Message;
+        await RefreshTargetAfterActionAsync(item.TargetPath, result, "关闭占用进程");
+    }
+
+    private async Task StopServiceItemAsync(LockInfo item)
+    {
+        if (!item.CanStopService)
+        {
+            var blocked = BuildCloseProcessBlockedMessage(item);
+            ShowNotice(blocked.Title, blocked.Message, blocked.Icon);
+            StatusMessage = blocked.Message;
+            return;
+        }
+
+        var serviceName = string.IsNullOrWhiteSpace(item.Notes) ? "未识别服务名" : item.Notes;
+        if (!ConfirmDangerousAction(
+            "停止占用服务",
+            item.HolderName,
+            [
+                $"服务名：{serviceName}",
+                $"路径：{item.HolderPath}"
+            ],
+            "停止服务可能影响后台任务、托盘同步或自动更新；建议先确认该服务确实属于当前目标。",
+            MessageBoxImage.Warning))
+        {
+            return;
+        }
+
+        var result = await RunBusyAsync($"正在停止占用服务：{item.HolderName}", () => unlockService.StopServiceAsync(item));
+        await RefreshTargetAfterActionAsync(item.TargetPath, result, "停止占用服务");
     }
 
     [RelayCommand]
-    private async Task RestartExplorerAsync()
+    private async Task RestartExplorerAsync(string? targetPath = null)
     {
         var result = await RunBusyAsync("正在重启资源管理器", () => unlockService.RestartExplorerAsync());
+        var targetToRefresh = ResolveRefreshTargetPath(targetPath);
+        if (!string.IsNullOrWhiteSpace(targetToRefresh))
+        {
+            await RefreshTargetAfterActionAsync(targetToRefresh, result, "重启资源管理器");
+            return;
+        }
+
         StatusMessage = result.Message;
     }
 
@@ -906,7 +958,7 @@ public sealed partial class UnlockAssistantViewModel(ILockDetectionService detec
                 $"类型：{(Directory.Exists(resolvedTargetPath) ? "文件夹" : "文件")}",
                 "执行内容：接管所有权、授予管理员权限并尝试立即删除"
             ],
-            "该操作会修改目标权限和属性，删除后不可恢复；如果目标仍被占用，请改用“重启后删除”。"))
+            BuildForceDeleteCaution(resolvedTargetPath)))
         {
             return;
         }
@@ -916,6 +968,8 @@ public sealed partial class UnlockAssistantViewModel(ILockDetectionService detec
         if (result.Success)
         {
             RemoveLockItemsForTarget(resolvedTargetPath);
+            StatusMessage = $"{result.Message} 目标已从当前列表移除。";
+            return;
         }
 
         StatusMessage = result.Message;
@@ -961,6 +1015,8 @@ public sealed partial class UnlockAssistantViewModel(ILockDetectionService detec
 
     private bool CanCloseProcess() => SelectedItem is not null;
 
+    private bool CanStopService() => SelectedItem?.CanStopService == true;
+
     private static (string Title, string Message, MessageBoxImage Icon) BuildCloseProcessBlockedMessage(LockInfo item)
     {
         if (item.Kind == SysCleaner.Domain.Enums.LockKind.Protected || item.Risk == SysCleaner.Domain.Enums.RiskLevel.Protected)
@@ -975,7 +1031,7 @@ public sealed partial class UnlockAssistantViewModel(ILockDetectionService detec
         {
             return (
                 "当前占用来自系统服务",
-                $"当前占用方“{item.HolderName}”被识别为服务，不支持按普通进程直接关闭。\n\n建议先停止对应服务，或在系统服务模块中处理。",
+                $"当前占用方“{item.HolderName}”被识别为服务，不支持按普通进程直接关闭。\n\n建议先停止对应服务，再自动复检是否已释放目标。",
                 MessageBoxImage.Information);
         }
 
@@ -991,6 +1047,32 @@ public sealed partial class UnlockAssistantViewModel(ILockDetectionService detec
             "当前项目不支持直接关闭",
             $"当前占用方“{item.HolderName}”不支持直接结束进程。\n\n建议根据结果中的“建议”列选择更合适的处理方式。",
             MessageBoxImage.Information);
+    }
+
+    private async Task RefreshTargetAfterActionAsync(string? targetPath, OperationResult result, string actionName)
+    {
+        if (!result.Success)
+        {
+            StatusMessage = result.Message;
+            return;
+        }
+
+        var targetToRefresh = ResolveRefreshTargetPath(targetPath);
+        if (string.IsNullOrWhiteSpace(targetToRefresh))
+        {
+            StatusMessage = result.Message;
+            return;
+        }
+
+        await RunBusyAsync($"正在复检：{actionName}", async () =>
+        {
+            ReportBusyProgress("正在复检目标占用情况", 1, 1);
+            var refreshedItems = await detectionService.DetectLocksAsync(targetToRefresh);
+            ReplaceLockItemsForTarget(targetToRefresh, refreshedItems);
+            StatusMessage = refreshedItems.Count == 0
+                ? $"{result.Message} 已复检，未再检测到明显占用。"
+                : $"{result.Message} 已复检，仍检测到 {refreshedItems.Count} 个占用方。";
+        });
     }
 
     private async Task DetectTargetsAsync(IReadOnlyList<string> targetPaths)
@@ -1087,6 +1169,19 @@ public sealed partial class UnlockAssistantViewModel(ILockDetectionService detec
         SelectedItem = LockItems.FirstOrDefault();
     }
 
+    private void ReplaceLockItemsForTarget(string targetPath, IReadOnlyList<LockInfo> refreshedItems)
+    {
+        RemoveLockItemsForTarget(targetPath);
+
+        foreach (var item in refreshedItems)
+        {
+            LockItems.Add(item with { TargetPath = targetPath });
+        }
+
+        SelectedItem = LockItems.FirstOrDefault(item => string.Equals(item.TargetPath, targetPath, StringComparison.OrdinalIgnoreCase))
+            ?? LockItems.FirstOrDefault();
+    }
+
     private static string ResolveTargetDisplayName(string targetPath)
     {
         var normalizedPath = targetPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
@@ -1095,7 +1190,71 @@ public sealed partial class UnlockAssistantViewModel(ILockDetectionService detec
             : Path.GetFileName(normalizedPath);
     }
 
-    partial void OnSelectedItemChanged(LockInfo? value) => CloseProcessCommand.NotifyCanExecuteChanged();
+    private static int GetRecommendedActionPriority(LockInfo item)
+    {
+        if (item.Kind == SysCleaner.Domain.Enums.LockKind.Shell)
+        {
+            return 0;
+        }
+
+        if (item.CanStopService)
+        {
+            return 1;
+        }
+
+        if (item.CanTerminate)
+        {
+            return 2;
+        }
+
+        if (item.Kind == SysCleaner.Domain.Enums.LockKind.Protected)
+        {
+            return 4;
+        }
+
+        return 3;
+    }
+
+    private static string BuildForceDeleteCaution(string targetPath)
+    {
+        var caution = "该操作会修改目标权限和属性，删除后不可恢复；如果目标仍被占用，请改用“重启后删除”。";
+        if (!IsSensitiveDeleteTarget(targetPath))
+        {
+            return caution;
+        }
+
+        return $"{caution}\n\n当前路径位于系统或用户关键目录下，请再次确认没有误选整个高风险目录。";
+    }
+
+    private static bool IsSensitiveDeleteTarget(string targetPath)
+    {
+        var normalizedTarget = Path.GetFullPath(targetPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return SensitiveDeleteRoots
+            .Where(root => !string.IsNullOrWhiteSpace(root))
+            .Select(root => Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+            .Any(root => string.Equals(root, normalizedTarget, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private string? ResolveRefreshTargetPath(string? targetPath)
+    {
+        if (!string.IsNullOrWhiteSpace(targetPath))
+        {
+            return targetPath;
+        }
+
+        if (!string.IsNullOrWhiteSpace(TargetPath) && (File.Exists(TargetPath) || Directory.Exists(TargetPath)))
+        {
+            return TargetPath;
+        }
+
+        return null;
+    }
+
+    partial void OnSelectedItemChanged(LockInfo? value)
+    {
+        CloseProcessCommand.NotifyCanExecuteChanged();
+        StopServiceCommand.NotifyCanExecuteChanged();
+    }
 
     public Task InitializeAsync() => Task.CompletedTask;
 }
@@ -1115,6 +1274,16 @@ public sealed partial class EmptyCleanupItemViewModel : ObservableObject
 
 public sealed partial class EmptyCleanupViewModel(IEmptyItemScanService service) : ViewModelBase, IInitializable
 {
+    private const int MaxScanResults = 2000;
+    private static readonly string[] HighRiskRoots =
+    [
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        Path.Combine(Path.GetPathRoot(Environment.SystemDirectory) ?? "C:\\", "Users"),
+        Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+        Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+        Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86)
+    ];
+
     private readonly EmptyCleanupPreferencesStore _preferencesStore = new();
     private bool _isLoadingPreferences;
 
@@ -1135,6 +1304,16 @@ public sealed partial class EmptyCleanupViewModel(IEmptyItemScanService service)
     public string CurrentScanModeDescription => IncludeSubfolders
         ? "会继续扫描所选目录下的所有子目录，并识别逐层变空的目录。"
         : "只检查所选目录当前层级，不向下递归子目录。";
+
+    public bool IsHighRiskRootPath => ResolveHighRiskRoot(RootPath) is not null;
+
+    public string RootPathRiskMessage => ResolveHighRiskRoot(RootPath) switch
+    {
+        null => string.Empty,
+        var riskyPath => $"当前扫描根目录属于高风险位置：{riskyPath}。建议优先只扫描，不要直接批量删除未核对项。"
+    };
+
+    public string ScanResultLimitDescription => $"为避免界面卡顿，单次扫描最多展示 {MaxScanResults} 个空项；达到上限后会提前停止。";
 
     [RelayCommand]
     private void BrowseRootPath()
@@ -1165,17 +1344,26 @@ public sealed partial class EmptyCleanupViewModel(IEmptyItemScanService service)
         }
 
         var modeText = IncludeSubfolders ? "包含子文件夹" : "仅当前层";
+        var progress = new Progress<EmptyItemScanProgress>(scanProgress =>
+        {
+            BusyMessage = scanProgress.ReachedResultLimit
+                ? $"正在扫描空项：已扫描 {scanProgress.ScannedDirectories} 个目录，发现 {scanProgress.FoundCandidates} 个空项，已达到展示上限。"
+                : $"正在扫描空项：已扫描 {scanProgress.ScannedDirectories} 个目录，发现 {scanProgress.FoundCandidates} 个空项。";
+            StatusMessage = $"扫描进行中：{scanProgress.CurrentPath}";
+        });
 
         await RunBusyAsync($"正在扫描空项：{RootPath}", async () =>
         {
             Items.Clear();
             CascadeDeleted.Clear();
-            foreach (var item in await service.ScanAsync(RootPath, IncludeSubfolders))
+            foreach (var item in await service.ScanAsync(RootPath, IncludeSubfolders, MaxScanResults, progress))
             {
                 Items.Add(new EmptyCleanupItemViewModel(item));
             }
 
-            StatusMessage = $"已扫描 {Items.Count} 个空项，模式：{modeText}。";
+            StatusMessage = Items.Count >= MaxScanResults
+                ? $"已扫描并展示前 {Items.Count} 个空项，模式：{modeText}；结果已达到上限。"
+                : $"已扫描 {Items.Count} 个空项，模式：{modeText}。";
         });
     }
 
@@ -1214,6 +1402,12 @@ public sealed partial class EmptyCleanupViewModel(IEmptyItemScanService service)
 
         _preferencesStore.SaveIncludeSubfolders(value);
         StatusMessage = value ? "空项扫描已切换为包含子文件夹。" : "空项扫描已切换为仅当前层。";
+    }
+
+    partial void OnRootPathChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsHighRiskRootPath));
+        OnPropertyChanged(nameof(RootPathRiskMessage));
     }
 
     [RelayCommand(CanExecute = nameof(CanActOnSelectedItem))]
@@ -1288,8 +1482,24 @@ public sealed partial class EmptyCleanupViewModel(IEmptyItemScanService service)
         _isLoadingPreferences = true;
         IncludeSubfolders = _preferencesStore.LoadIncludeSubfolders();
         _isLoadingPreferences = false;
+        OnPropertyChanged(nameof(IsHighRiskRootPath));
+        OnPropertyChanged(nameof(RootPathRiskMessage));
         StatusMessage = IncludeSubfolders ? "已恢复上次扫描模式：包含子文件夹。" : "已恢复上次扫描模式：仅当前层。";
         return Task.CompletedTask;
+    }
+
+    private static string? ResolveHighRiskRoot(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+
+        var normalizedPath = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return HighRiskRoots
+            .Where(root => !string.IsNullOrWhiteSpace(root))
+            .Select(root => Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+            .FirstOrDefault(root => string.Equals(root, normalizedPath, StringComparison.OrdinalIgnoreCase));
     }
 }
 

@@ -9,4 +9,5 @@ public interface IUnlockAssistanceService
     Task<OperationResult> ForceDeleteAsync(string targetPath, CancellationToken cancellationToken = default);
     Task<OperationResult> RestartExplorerAsync(CancellationToken cancellationToken = default);
     Task<OperationResult> ScheduleDeleteOnRebootAsync(string targetPath, CancellationToken cancellationToken = default);
+    Task<OperationResult> StopServiceAsync(LockInfo lockInfo, CancellationToken cancellationToken = default);
 }

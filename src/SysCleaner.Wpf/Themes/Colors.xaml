@@ -209,6 +209,12 @@
                 <Setter Property="BorderBrush" Value="Transparent" />
                 <Setter Property="BorderThickness" Value="0" />
             </DataTrigger>
+            <DataTrigger Binding="{Binding ., Converter={StaticResource LockRecommendedActionTextConverter}}" Value="停止服务">
+                <Setter Property="Background" Value="{StaticResource Brush.Warning}" />
+                <Setter Property="Foreground" Value="White" />
+                <Setter Property="BorderBrush" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+            </DataTrigger>
             <DataTrigger Binding="{Binding ., Converter={StaticResource LockRecommendedActionTextConverter}}" Value="重启资源管理器">
                 <Setter Property="Background" Value="{StaticResource Brush.Info}" />
                 <Setter Property="Foreground" Value="White" />

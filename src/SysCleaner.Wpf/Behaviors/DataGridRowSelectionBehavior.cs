@@ -110,9 +110,9 @@ public static class DataGridRowSelectionBehavior
         row.Focus();
 
         var command = GetDoubleClickCommand(dataGrid);
-        if (command?.CanExecute(null) is true)
+        if (command?.CanExecute(row.Item) is true)
         {
-            command.Execute(null);
+            command.Execute(row.Item);
             e.Handled = true;
         }
     }

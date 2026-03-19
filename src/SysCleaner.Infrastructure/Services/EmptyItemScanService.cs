@@ -15,7 +15,7 @@ public sealed class EmptyItemScanService(IHistoryService historyService) : IEmpt
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
     ];
 
-    public Task<IReadOnlyList<CleanupCandidate>> ScanAsync(string rootPath, bool includeSubfolders = true, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<CleanupCandidate>> ScanAsync(string rootPath, bool includeSubfolders = true, int maxResults = int.MaxValue, IProgress<EmptyItemScanProgress>? progress = null, CancellationToken cancellationToken = default)
     {
         return Task.Run<IReadOnlyList<CleanupCandidate>>(() =>
         {
@@ -25,13 +25,14 @@ public sealed class EmptyItemScanService(IHistoryService historyService) : IEmpt
             }
 
             var candidates = new List<CleanupCandidate>();
+            var scanState = new ScanState(candidates, maxResults, progress);
             if (includeSubfolders)
             {
-                Traverse(rootPath, rootPath, candidates, cancellationToken);
+                Traverse(rootPath, rootPath, scanState, cancellationToken);
             }
             else
             {
-                ScanCurrentLevel(rootPath, candidates, cancellationToken);
+                ScanCurrentLevel(rootPath, scanState, cancellationToken);
             }
 
             return candidates.OrderBy(x => x.TargetPath).ToList();
@@ -66,10 +67,16 @@ public sealed class EmptyItemScanService(IHistoryService historyService) : IEmpt
         return cascadeDeleted;
     }
 
-    private static bool Traverse(string scanRoot, string current, List<CleanupCandidate> candidates, CancellationToken cancellationToken)
+    private static bool Traverse(string scanRoot, string current, ScanState scanState, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (IsProtected(current) || IsReparsePoint(current))
+        scanState.ReportDirectory(current);
+        if (scanState.ReachedLimit)
+        {
+            return true;
+        }
+
+        if (ShouldSkipScanPath(scanRoot, current) || IsReparsePoint(current))
         {
             return true;
         }
@@ -80,9 +87,14 @@ public sealed class EmptyItemScanService(IHistoryService historyService) : IEmpt
 
         foreach (var directory in directories)
         {
-            if (Traverse(scanRoot, directory, candidates, cancellationToken))
+            if (Traverse(scanRoot, directory, scanState, cancellationToken))
             {
                 hasNonEmptyContent = true;
+            }
+
+            if (scanState.ReachedLimit)
+            {
+                return true;
             }
         }
 
@@ -90,7 +102,7 @@ public sealed class EmptyItemScanService(IHistoryService historyService) : IEmpt
         {
             if (IsZeroLengthFile(file))
             {
-                candidates.Add(new CleanupCandidate(Guid.NewGuid().ToString("N"), CleanupCategory.EmptyFile, Path.GetFileName(file), file, scanRoot, "零字节文件", ItemHealth.Healthy, RiskLevel.Safe, false, true, false));
+                scanState.TryAddCandidate(new CleanupCandidate(Guid.NewGuid().ToString("N"), CleanupCategory.EmptyFile, Path.GetFileName(file), file, scanRoot, "零字节文件", ItemHealth.Healthy, RiskLevel.Safe, false, true, false));
                 continue;
             }
 
@@ -99,27 +111,42 @@ public sealed class EmptyItemScanService(IHistoryService historyService) : IEmpt
 
         if (current != scanRoot && !hasNonEmptyContent)
         {
-            candidates.Add(new CleanupCandidate(Guid.NewGuid().ToString("N"), CleanupCategory.EmptyFolder, Path.GetFileName(current), current, scanRoot, "空文件夹", ItemHealth.Healthy, RiskLevel.Safe, false, true, false));
+            scanState.TryAddCandidate(new CleanupCandidate(Guid.NewGuid().ToString("N"), CleanupCategory.EmptyFolder, Path.GetFileName(current), current, scanRoot, "空文件夹", ItemHealth.Healthy, RiskLevel.Safe, false, true, false));
         }
 
         return hasNonEmptyContent;
     }
 
-    private static void ScanCurrentLevel(string scanRoot, List<CleanupCandidate> candidates, CancellationToken cancellationToken)
+    internal static bool ShouldSkipScanPath(string scanRoot, string current)
+    {
+        var normalizedScanRoot = Path.GetFullPath(scanRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var normalizedCurrent = Path.GetFullPath(current).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        return !string.Equals(normalizedScanRoot, normalizedCurrent, StringComparison.OrdinalIgnoreCase)
+            && IsProtected(current);
+    }
+
+    private static void ScanCurrentLevel(string scanRoot, ScanState scanState, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        scanState.ReportDirectory(scanRoot);
 
         foreach (var file in ScanUtilities.EnumerateSafeFiles(scanRoot))
         {
             if (IsZeroLengthFile(file))
             {
-                candidates.Add(new CleanupCandidate(Guid.NewGuid().ToString("N"), CleanupCategory.EmptyFile, Path.GetFileName(file), file, scanRoot, "零字节文件", ItemHealth.Healthy, RiskLevel.Safe, false, true, false));
+                scanState.TryAddCandidate(new CleanupCandidate(Guid.NewGuid().ToString("N"), CleanupCategory.EmptyFile, Path.GetFileName(file), file, scanRoot, "零字节文件", ItemHealth.Healthy, RiskLevel.Safe, false, true, false));
+                if (scanState.ReachedLimit)
+                {
+                    return;
+                }
             }
         }
 
         foreach (var directory in ScanUtilities.EnumerateSafeDirectories(scanRoot))
         {
             cancellationToken.ThrowIfCancellationRequested();
+            scanState.ReportDirectory(directory);
             if (IsProtected(directory) || IsReparsePoint(directory))
             {
                 continue;
@@ -128,7 +155,11 @@ public sealed class EmptyItemScanService(IHistoryService historyService) : IEmpt
             var hasAnyEntries = ScanUtilities.EnumerateSafeDirectories(directory).Any() || ScanUtilities.EnumerateSafeFiles(directory).Any();
             if (!hasAnyEntries)
             {
-                candidates.Add(new CleanupCandidate(Guid.NewGuid().ToString("N"), CleanupCategory.EmptyFolder, Path.GetFileName(directory), directory, scanRoot, "空文件夹", ItemHealth.Healthy, RiskLevel.Safe, false, true, false));
+                scanState.TryAddCandidate(new CleanupCandidate(Guid.NewGuid().ToString("N"), CleanupCategory.EmptyFolder, Path.GetFileName(directory), directory, scanRoot, "空文件夹", ItemHealth.Healthy, RiskLevel.Safe, false, true, false));
+                if (scanState.ReachedLimit)
+                {
+                    return;
+                }
             }
         }
     }
@@ -225,6 +256,35 @@ public sealed class EmptyItemScanService(IHistoryService historyService) : IEmpt
         }
         catch
         {
+            return true;
+        }
+    }
+
+    private sealed class ScanState(List<CleanupCandidate> candidates, int maxResults, IProgress<EmptyItemScanProgress>? progress)
+    {
+        private readonly List<CleanupCandidate> _candidates = candidates;
+        private readonly int _maxResults = maxResults > 0 ? maxResults : int.MaxValue;
+        private readonly IProgress<EmptyItemScanProgress>? _progress = progress;
+
+        public int ScannedDirectories { get; private set; }
+
+        public bool ReachedLimit => _candidates.Count >= _maxResults;
+
+        public void ReportDirectory(string currentPath)
+        {
+            ScannedDirectories++;
+            _progress?.Report(new EmptyItemScanProgress(ScannedDirectories, _candidates.Count, currentPath, ReachedLimit));
+        }
+
+        public bool TryAddCandidate(CleanupCandidate candidate)
+        {
+            if (ReachedLimit)
+            {
+                return false;
+            }
+
+            _candidates.Add(candidate);
+            _progress?.Report(new EmptyItemScanProgress(ScannedDirectories, _candidates.Count, candidate.TargetPath, ReachedLimit));
             return true;
         }
     }

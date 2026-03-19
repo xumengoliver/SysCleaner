@@ -83,9 +83,18 @@ public sealed class LockDetectionService : ILockDetectionService
                 string.Empty,
                 protectedProcess ? LockKind.Protected : kind,
                 protectedProcess ? RiskLevel.Protected : kind == LockKind.Service ? RiskLevel.High : RiskLevel.Review,
-                !protectedProcess && kind is LockKind.Process or LockKind.Shell,
+                !protectedProcess && kind == LockKind.Process,
                 !protectedProcess && kind == LockKind.Service,
-                kind == LockKind.Shell ? "可尝试重启资源管理器后重试。" : "可先关闭占用进程后重试。",
+                kind switch
+                {
+                    LockKind.Shell => "建议优先重启资源管理器并自动复检，不要直接结束壳层进程。",
+                    LockKind.Service => string.IsNullOrWhiteSpace(info.strServiceShortName)
+                        ? "建议先停止相关服务后再复检。"
+                        : $"建议先停止服务“{info.strServiceShortName}”后再复检。",
+                    LockKind.Process => "建议先尝试关闭当前占用进程，系统会在执行后自动复检。",
+                    LockKind.Protected => "当前为受保护进程，请先关闭相关应用或使用更安全的替代动作。",
+                    _ => "建议关闭相关应用后重新识别，必要时改用重启后删除。"
+                },
                 info.strServiceShortName);
         }
         catch

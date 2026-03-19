@@ -49,6 +49,37 @@ public sealed class ServiceControlService(IInstalledAppService installedAppServi
         }, cancellationToken);
     }
 
+    public async Task<OperationResult> StopAsync(string serviceName, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(serviceName))
+        {
+            return new OperationResult(false, "未识别到服务名。");
+        }
+
+        try
+        {
+            var stopResult = await RunScAsync(cancellationToken, "stop", serviceName);
+            if (stopResult.ExitCode == 0 || IsIgnorableStopResult(stopResult.Output))
+            {
+                var message = stopResult.ExitCode == 0
+                    ? $"已向服务 {serviceName} 发送停止请求。"
+                    : $"服务 {serviceName} 当前未运行，无需停止。";
+                await historyService.LogAsync(new OperationLogEntry(0, DateTime.Now, "Service", "Stop", serviceName, "Success", message), cancellationToken);
+                return new OperationResult(true, message);
+            }
+
+            var failure = string.IsNullOrWhiteSpace(stopResult.Output) ? "sc stop 执行失败。" : stopResult.Output;
+            await historyService.LogAsync(new OperationLogEntry(0, DateTime.Now, "Service", "Stop", serviceName, "Failed", failure), cancellationToken);
+            return new OperationResult(false, failure);
+        }
+        catch (Exception ex)
+        {
+            var message = ScanUtilities.DescribeException(ex);
+            await historyService.LogAsync(new OperationLogEntry(0, DateTime.Now, "Service", "Stop", serviceName, "Failed", message), cancellationToken);
+            return new OperationResult(false, message);
+        }
+    }
+
     public async Task<OperationResult> DeleteAsync(CleanupCandidate candidate, CancellationToken cancellationToken = default)
     {
         var serviceName = ExtractServiceName(candidate);

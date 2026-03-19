@@ -55,8 +55,15 @@
                     <Button Content="扫描" Command="{Binding ScanCommand}" />
                     <Button Style="{StaticResource DangerButtonStyle}" Content="执行删除" Command="{Binding ExecuteCommand}" />
                 </WrapPanel>
+                <Border Style="{StaticResource ChipBorderStyle}" Margin="0,12,0,0" Background="#FFF7ED" HorizontalAlignment="Left"
+                        Visibility="{Binding IsHighRiskRootPath, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="{Binding RootPathRiskMessage}" Foreground="{StaticResource Brush.Warning}" TextWrapping="Wrap" />
+                </Border>
                 <Border Style="{StaticResource ChipBorderStyle}" Margin="0,12,0,0" Background="White" HorizontalAlignment="Left">
                     <TextBlock Text="执行前请检查选中项路径；可切换为仅当前层扫描，级联删除仍会继续移除新变空的父目录。" Foreground="{StaticResource Brush.SecondaryText}" />
+                </Border>
+                <Border Style="{StaticResource ChipBorderStyle}" Margin="0,12,0,0" Background="{StaticResource Brush.AccentSoft}" HorizontalAlignment="Left">
+                    <TextBlock Text="{Binding ScanResultLimitDescription}" Foreground="{StaticResource Brush.Accent}" TextWrapping="Wrap" />
                 </Border>
             </StackPanel>
         </Border>
