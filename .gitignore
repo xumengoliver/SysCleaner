@@ -4,10 +4,16 @@
 *.user
 *.userosscache
 *.sln.docstates
+*.rsuser
 
 # VS Code
 .vscode/
 project_docs/
+
+# Rider / ReSharper
+.idea/
+_ReSharper*/
+*.DotSettings.user
 
 # .NET build outputs
 **/bin/
@@ -15,15 +21,40 @@ project_docs/
 **/artifacts/
 artifacts/
 TestResults/
+Debug/
+Release/
+publish/
 
 # NuGet
 *.nupkg
 *.snupkg
 
+# Test coverage
+coverage/
+coverage-*/
+*.coverage
+*.coveragexml
+
+# Desktop packaging
+*.appx
+*.appxbundle
+*.msix
+*.msixbundle
+*.msixupload
+
+# SQLite and local data
+*.db-shm
+*.db-wal
+
 # Logs and diagnostics
 *.log
 *.tmp
 *.cache
+
+# Office temporary files
+~$*.docx
+~$*.xlsx
+~$*.pptx
 
 # OS files
 Thumbs.db
