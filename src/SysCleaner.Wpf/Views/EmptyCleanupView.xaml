@@ -19,7 +19,38 @@
                     <TextBox Grid.Column="0" Margin="0,0,10,0" Text="{Binding RootPath, UpdateSourceTrigger=PropertyChanged}" />
                     <Button Grid.Column="1" Style="{StaticResource SecondaryButtonStyle}" Content="选择文件夹" Command="{Binding BrowseRootPathCommand}" />
                 </Grid>
-                <CheckBox Margin="0,10,0,0" IsChecked="{Binding IncludeSubfolders}" Content="扫描子文件夹" />
+                <WrapPanel Margin="0,10,0,0" VerticalAlignment="Center">
+                    <CheckBox IsChecked="{Binding IncludeSubfolders}" Content="扫描子文件夹" VerticalAlignment="Center" />
+                    <Border Margin="12,0,0,0">
+                        <Border.Style>
+                            <Style TargetType="Border" BasedOn="{StaticResource ChipBorderStyle}">
+                                <Setter Property="Background" Value="{StaticResource Brush.AccentSoft}" />
+                                <Setter Property="BorderBrush" Value="{StaticResource Brush.Accent}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IncludeSubfolders}" Value="False">
+                                        <Setter Property="Background" Value="#FFF7ED" />
+                                        <Setter Property="BorderBrush" Value="{StaticResource Brush.Warning}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel>
+                            <TextBlock Text="{Binding CurrentScanModeLabel}" FontWeight="SemiBold">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IncludeSubfolders}" Value="False">
+                                                <Setter Property="Foreground" Value="{StaticResource Brush.Warning}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock Margin="0,2,0,0" Text="{Binding CurrentScanModeDescription}" Foreground="{StaticResource Brush.SecondaryText}" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+                </WrapPanel>
                 <WrapPanel Margin="0,10,0,0">
                     <Button Content="扫描" Command="{Binding ScanCommand}" />
                     <Button Style="{StaticResource DangerButtonStyle}" Content="执行删除" Command="{Binding ExecuteCommand}" />

@@ -1115,6 +1115,9 @@ public sealed partial class EmptyCleanupItemViewModel : ObservableObject
 
 public sealed partial class EmptyCleanupViewModel(IEmptyItemScanService service) : ViewModelBase, IInitializable
 {
+    private readonly EmptyCleanupPreferencesStore _preferencesStore = new();
+    private bool _isLoadingPreferences;
+
     public ObservableCollection<EmptyCleanupItemViewModel> Items { get; } = [];
     public ObservableCollection<CleanupCandidate> CascadeDeleted { get; } = [];
 
@@ -1126,6 +1129,12 @@ public sealed partial class EmptyCleanupViewModel(IEmptyItemScanService service)
 
     [ObservableProperty]
     private bool _includeSubfolders = true;
+
+    public string CurrentScanModeLabel => IncludeSubfolders ? "当前模式：递归子文件夹" : "当前模式：仅当前层";
+
+    public string CurrentScanModeDescription => IncludeSubfolders
+        ? "会继续扫描所选目录下的所有子目录，并识别逐层变空的目录。"
+        : "只检查所选目录当前层级，不向下递归子目录。";
 
     [RelayCommand]
     private void BrowseRootPath()
@@ -1195,6 +1204,15 @@ public sealed partial class EmptyCleanupViewModel(IEmptyItemScanService service)
 
     partial void OnIncludeSubfoldersChanged(bool value)
     {
+        OnPropertyChanged(nameof(CurrentScanModeLabel));
+        OnPropertyChanged(nameof(CurrentScanModeDescription));
+
+        if (_isLoadingPreferences)
+        {
+            return;
+        }
+
+        _preferencesStore.SaveIncludeSubfolders(value);
         StatusMessage = value ? "空项扫描已切换为包含子文件夹。" : "空项扫描已切换为仅当前层。";
     }
 
@@ -1265,7 +1283,14 @@ public sealed partial class EmptyCleanupViewModel(IEmptyItemScanService service)
         return true;
     }
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task InitializeAsync()
+    {
+        _isLoadingPreferences = true;
+        IncludeSubfolders = _preferencesStore.LoadIncludeSubfolders();
+        _isLoadingPreferences = false;
+        StatusMessage = IncludeSubfolders ? "已恢复上次扫描模式：包含子文件夹。" : "已恢复上次扫描模式：仅当前层。";
+        return Task.CompletedTask;
+    }
 }
 
 public sealed partial class ResidueViewModel(IInstalledAppService appService, IResidueAnalysisService residueService, ICleanupExecutionService cleanupExecutionService) : ViewModelBase, IInitializable
