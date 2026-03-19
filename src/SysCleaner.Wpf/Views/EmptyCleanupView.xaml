@@ -19,12 +19,13 @@
                     <TextBox Grid.Column="0" Margin="0,0,10,0" Text="{Binding RootPath, UpdateSourceTrigger=PropertyChanged}" />
                     <Button Grid.Column="1" Style="{StaticResource SecondaryButtonStyle}" Content="选择文件夹" Command="{Binding BrowseRootPathCommand}" />
                 </Grid>
+                <CheckBox Margin="0,10,0,0" IsChecked="{Binding IncludeSubfolders}" Content="扫描子文件夹" />
                 <WrapPanel Margin="0,10,0,0">
                     <Button Content="扫描" Command="{Binding ScanCommand}" />
                     <Button Style="{StaticResource DangerButtonStyle}" Content="执行删除" Command="{Binding ExecuteCommand}" />
                 </WrapPanel>
                 <Border Style="{StaticResource ChipBorderStyle}" Margin="0,12,0,0" Background="White" HorizontalAlignment="Left">
-                    <TextBlock Text="执行前请检查选中项路径，级联删除会继续移除新变空的父目录。" Foreground="{StaticResource Brush.SecondaryText}" />
+                    <TextBlock Text="执行前请检查选中项路径；可切换为仅当前层扫描，级联删除仍会继续移除新变空的父目录。" Foreground="{StaticResource Brush.SecondaryText}" />
                 </Border>
             </StackPanel>
         </Border>

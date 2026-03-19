@@ -23,6 +23,42 @@ public sealed class EmptyItemScanServiceTests
     }
 
     [Fact]
+    public async Task ScanAsync_FindsEmptyItemsInNestedSubfolders()
+    {
+        using var fixture = new TempDirectoryFixture();
+        var parent = Directory.CreateDirectory(Path.Combine(fixture.RootPath, "parent"));
+        var child = Directory.CreateDirectory(Path.Combine(parent.FullName, "child"));
+        var emptyFile = Path.Combine(child.FullName, "empty.txt");
+        File.WriteAllText(emptyFile, string.Empty);
+
+        var service = new EmptyItemScanService(new FakeHistoryService());
+
+        var results = await service.ScanAsync(fixture.RootPath);
+
+        Assert.Contains(results, x => x.TargetPath == emptyFile);
+        Assert.Contains(results, x => x.TargetPath == child.FullName);
+        Assert.Contains(results, x => x.TargetPath == parent.FullName);
+    }
+
+    [Fact]
+    public async Task ScanAsync_DoesNotScanNestedSubfoldersWhenDisabled()
+    {
+        using var fixture = new TempDirectoryFixture();
+        var parent = Directory.CreateDirectory(Path.Combine(fixture.RootPath, "parent"));
+        var child = Directory.CreateDirectory(Path.Combine(parent.FullName, "child"));
+        var emptyFile = Path.Combine(child.FullName, "empty.txt");
+        File.WriteAllText(emptyFile, string.Empty);
+
+        var service = new EmptyItemScanService(new FakeHistoryService());
+
+        var results = await service.ScanAsync(fixture.RootPath, includeSubfolders: false);
+
+        Assert.DoesNotContain(results, x => x.TargetPath == emptyFile);
+        Assert.DoesNotContain(results, x => x.TargetPath == child.FullName);
+        Assert.DoesNotContain(results, x => x.TargetPath == parent.FullName);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_CascadeDeletesParentFolderWhenItBecomesEmpty()
     {
         using var fixture = new TempDirectoryFixture();

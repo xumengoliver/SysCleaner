@@ -1124,6 +1124,9 @@ public sealed partial class EmptyCleanupViewModel(IEmptyItemScanService service)
     [ObservableProperty]
     private string _rootPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
 
+    [ObservableProperty]
+    private bool _includeSubfolders = true;
+
     [RelayCommand]
     private void BrowseRootPath()
     {
@@ -1152,16 +1155,18 @@ public sealed partial class EmptyCleanupViewModel(IEmptyItemScanService service)
             return;
         }
 
+        var modeText = IncludeSubfolders ? "包含子文件夹" : "仅当前层";
+
         await RunBusyAsync($"正在扫描空项：{RootPath}", async () =>
         {
             Items.Clear();
             CascadeDeleted.Clear();
-            foreach (var item in await service.ScanAsync(RootPath))
+            foreach (var item in await service.ScanAsync(RootPath, IncludeSubfolders))
             {
                 Items.Add(new EmptyCleanupItemViewModel(item));
             }
 
-            StatusMessage = $"已扫描 {Items.Count} 个空项。";
+            StatusMessage = $"已扫描 {Items.Count} 个空项，模式：{modeText}。";
         });
     }
 
@@ -1186,6 +1191,11 @@ public sealed partial class EmptyCleanupViewModel(IEmptyItemScanService service)
             StatusMessage = $"已执行 {selected.Count} 个空项删除，级联删除 {CascadeDeleted.Count} 个父目录。";
             await ScanAsync();
         });
+    }
+
+    partial void OnIncludeSubfoldersChanged(bool value)
+    {
+        StatusMessage = value ? "空项扫描已切换为包含子文件夹。" : "空项扫描已切换为仅当前层。";
     }
 
     [RelayCommand(CanExecute = nameof(CanActOnSelectedItem))]
