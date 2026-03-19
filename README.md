@@ -103,6 +103,86 @@ dotnet publish src/SysCleaner.Wpf/SysCleaner.Wpf.csproj -c Release -r win-x64 --
 - A dedicated MSIX or installer project is not currently configured in this repository snapshot.
 - For internal distribution, the publish output can be zipped and distributed directly.
 
+### GitHub Release workflow
+
+Recommended tag format:
+
+```text
+v<major>.<minor>.<patch>
+```
+
+Examples:
+
+```text
+v1.0.0
+v1.1.0
+v1.1.1
+```
+
+Recommended asset naming:
+
+```text
+SysCleaner-v<version>-win-x64-framework-dependent.zip
+SysCleaner-v<version>-win-x64-self-contained.zip
+```
+
+Example asset names:
+
+```text
+SysCleaner-v1.0.0-win-x64-framework-dependent.zip
+SysCleaner-v1.0.0-win-x64-self-contained.zip
+```
+
+Suggested release checklist:
+
+1. Ensure the working tree is clean.
+2. Run release validation.
+3. Publish the required package type.
+4. Compress the publish output into a versioned zip file.
+5. Create and push the version tag.
+6. Create the GitHub Release and upload the zip asset.
+
+Suggested validation commands:
+
+```powershell
+dotnet build SysCleaner.slnx -c Release
+dotnet test SysCleaner.slnx -c Release
+```
+
+Example framework-dependent release flow:
+
+```powershell
+dotnet publish src/SysCleaner.Wpf/SysCleaner.Wpf.csproj -c Release -r win-x64 --self-contained false
+Compress-Archive -Path src/SysCleaner.Wpf/bin/Release/net8.0-windows/win-x64/publish/* -DestinationPath SysCleaner-v1.0.0-win-x64-framework-dependent.zip -Force
+git tag v1.0.0
+git push origin main
+git push origin v1.0.0
+```
+
+Example self-contained release flow:
+
+```powershell
+dotnet publish src/SysCleaner.Wpf/SysCleaner.Wpf.csproj -c Release -r win-x64 --self-contained true
+Compress-Archive -Path src/SysCleaner.Wpf/bin/Release/net8.0-windows/win-x64/publish/* -DestinationPath SysCleaner-v1.0.0-win-x64-self-contained.zip -Force
+```
+
+Suggested GitHub Release steps:
+
+1. Open the repository Releases page.
+2. Choose Draft a new release.
+3. Select the pushed tag, such as v1.0.0.
+4. Use a release title matching the version, such as SysCleaner v1.0.0.
+5. Summarize major changes, fixes, and any breaking notes.
+6. Upload the generated zip asset.
+7. Publish the release.
+
+Suggested release notes structure:
+
+- Added: new modules or user-facing capabilities
+- Improved: behavior, performance, or usability changes
+- Fixed: bugs or incorrect cleanup behavior
+- Notes: elevation requirements, compatibility notes, or known limitations
+
 ## Usage Flow
 
 1. Open the app and choose a cleanup module from the left navigation.
