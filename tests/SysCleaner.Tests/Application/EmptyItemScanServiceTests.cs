@@ -72,6 +72,33 @@ public sealed class EmptyItemScanServiceTests
     }
 
     [Fact]
+    public void ShouldSkipScanPath_AllowsProtectedInstallPathChildrenWhenRootIsExplicitlySelected()
+    {
+        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        Assert.False(string.IsNullOrWhiteSpace(programFiles));
+
+        var child = Path.Combine(programFiles, "Vendor", "Empty");
+
+        var shouldSkip = EmptyItemScanService.ShouldSkipScanPath(programFiles, child);
+
+        Assert.False(shouldSkip);
+    }
+
+    [Fact]
+    public void ShouldSkipScanPath_StillSkipsProtectedInstallPathWhenScanningDriveRoot()
+    {
+        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        Assert.False(string.IsNullOrWhiteSpace(programFiles));
+
+        var driveRoot = Path.GetPathRoot(programFiles);
+        Assert.False(string.IsNullOrWhiteSpace(driveRoot));
+
+        var shouldSkip = EmptyItemScanService.ShouldSkipScanPath(driveRoot!, Path.Combine(programFiles, "Vendor"));
+
+        Assert.True(shouldSkip);
+    }
+
+    [Fact]
     public async Task ScanAsync_StopsAtConfiguredResultLimit()
     {
         using var fixture = new TempDirectoryFixture();
@@ -123,6 +150,25 @@ public sealed class EmptyItemScanServiceTests
         await service.ExecuteAsync(fixture.RootPath, selected);
 
         Assert.False(File.Exists(emptyFile));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ReportsProgress()
+    {
+        using var fixture = new TempDirectoryFixture();
+        File.WriteAllText(Path.Combine(fixture.RootPath, "empty-1.txt"), string.Empty);
+        File.WriteAllText(Path.Combine(fixture.RootPath, "empty-2.txt"), string.Empty);
+
+        var progressEvents = new List<EmptyItemCleanupProgress>();
+        var progress = new Progress<EmptyItemCleanupProgress>(item => progressEvents.Add(item));
+        var service = new EmptyItemScanService(new FakeHistoryService());
+        var candidates = await service.ScanAsync(fixture.RootPath, includeSubfolders: false);
+
+        await service.ExecuteAsync(fixture.RootPath, candidates, progress);
+
+        Assert.NotEmpty(progressEvents);
+        Assert.Contains(progressEvents, item => item.ProcessedCandidates == 0 && item.TotalCandidates == candidates.Count);
+        Assert.Contains(progressEvents, item => item.ProcessedCandidates == candidates.Count);
     }
 
     private sealed class FakeHistoryService : IHistoryService

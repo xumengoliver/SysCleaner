@@ -210,10 +210,10 @@
                 <Border Grid.Row="1" Margin="20,16,20,20" Background="Transparent">
                     <Grid>
                         <ContentControl Content="{Binding CurrentViewModel}"
-                                        IsEnabled="{Binding CurrentViewModel.IsBusy, Converter={StaticResource InverseBooleanConverter}, TargetNullValue=True}" />
+                                        IsEnabled="{Binding CurrentViewModel.IsBlockingBusy, Converter={StaticResource InverseBooleanConverter}, TargetNullValue=True}" />
                         <Border Background="#CCFFFFFF"
                                 CornerRadius="24"
-                                Visibility="{Binding CurrentViewModel.IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                Visibility="{Binding CurrentViewModel.IsBlockingBusy, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <Grid>
                                 <Border Width="360"
                                         Padding="24"

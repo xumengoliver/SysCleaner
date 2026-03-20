@@ -39,16 +39,23 @@ public sealed class EmptyItemScanService(IHistoryService historyService) : IEmpt
         }, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<CleanupCandidate>> ExecuteAsync(string rootPath, IReadOnlyList<CleanupCandidate> selectedCandidates, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<CleanupCandidate>> ExecuteAsync(string rootPath, IReadOnlyList<CleanupCandidate> selectedCandidates, IProgress<EmptyItemCleanupProgress>? progress = null, CancellationToken cancellationToken = default)
     {
         var cascadeDeleted = new List<CleanupCandidate>();
         var deletedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var orderedCandidates = selectedCandidates
+            .OrderByDescending(x => x.TargetPath.Count(ch => ch == Path.DirectorySeparatorChar || ch == Path.AltDirectorySeparatorChar))
+            .ToList();
 
-        foreach (var candidate in selectedCandidates.OrderByDescending(x => x.TargetPath.Count(ch => ch == Path.DirectorySeparatorChar || ch == Path.AltDirectorySeparatorChar)))
+        progress?.Report(new EmptyItemCleanupProgress(0, orderedCandidates.Count, string.Empty, 0));
+
+        for (var index = 0; index < orderedCandidates.Count; index++)
         {
+            var candidate = orderedCandidates[index];
             cancellationToken.ThrowIfCancellationRequested();
             if (deletedPaths.Contains(candidate.TargetPath))
             {
+                progress?.Report(new EmptyItemCleanupProgress(index + 1, orderedCandidates.Count, candidate.TargetPath, cascadeDeleted.Count));
                 continue;
             }
 
@@ -56,12 +63,14 @@ public sealed class EmptyItemScanService(IHistoryService historyService) : IEmpt
             if (!deletion.Success)
             {
                 await historyService.LogAsync(new OperationLogEntry(0, DateTime.Now, "EmptyCleanup", "Delete", candidate.TargetPath, "Failed", deletion.Message), cancellationToken);
+                progress?.Report(new EmptyItemCleanupProgress(index + 1, orderedCandidates.Count, candidate.TargetPath, cascadeDeleted.Count));
                 continue;
             }
 
             deletedPaths.Add(candidate.TargetPath);
             await historyService.LogAsync(new OperationLogEntry(0, DateTime.Now, "EmptyCleanup", "Delete", candidate.TargetPath, "Success", deletion.Message), cancellationToken);
             await CascadeParentsAsync(rootPath, candidate.TargetPath, cascadeDeleted, deletedPaths, cancellationToken);
+            progress?.Report(new EmptyItemCleanupProgress(index + 1, orderedCandidates.Count, candidate.TargetPath, cascadeDeleted.Count));
         }
 
         return cascadeDeleted;
@@ -119,11 +128,20 @@ public sealed class EmptyItemScanService(IHistoryService historyService) : IEmpt
 
     internal static bool ShouldSkipScanPath(string scanRoot, string current)
     {
-        var normalizedScanRoot = Path.GetFullPath(scanRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var normalizedCurrent = Path.GetFullPath(current).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var normalizedScanRoot = NormalizePath(scanRoot);
+        var normalizedCurrent = NormalizePath(current);
 
-        return !string.Equals(normalizedScanRoot, normalizedCurrent, StringComparison.OrdinalIgnoreCase)
-            && IsProtected(current);
+        if (string.Equals(normalizedScanRoot, normalizedCurrent, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (IsWithinExplicitlyAllowedProtectedScope(normalizedScanRoot, normalizedCurrent))
+        {
+            return false;
+        }
+
+        return IsProtected(normalizedCurrent);
     }
 
     private static void ScanCurrentLevel(string scanRoot, ScanState scanState, CancellationToken cancellationToken)
@@ -147,7 +165,7 @@ public sealed class EmptyItemScanService(IHistoryService historyService) : IEmpt
         {
             cancellationToken.ThrowIfCancellationRequested();
             scanState.ReportDirectory(directory);
-            if (IsProtected(directory) || IsReparsePoint(directory))
+            if (ShouldSkipScanPath(scanRoot, directory) || IsReparsePoint(directory))
             {
                 continue;
             }
@@ -170,7 +188,7 @@ public sealed class EmptyItemScanService(IHistoryService historyService) : IEmpt
         while (parent is not null)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (string.Equals(parent.FullName, rootPath, StringComparison.OrdinalIgnoreCase) || IsProtected(parent.FullName))
+            if (string.Equals(parent.FullName, rootPath, StringComparison.OrdinalIgnoreCase) || ShouldSkipScanPath(rootPath, parent.FullName))
             {
                 return;
             }
@@ -228,17 +246,17 @@ public sealed class EmptyItemScanService(IHistoryService historyService) : IEmpt
 
     private static bool IsProtected(string path)
     {
-        var normalizedPath = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var normalizedPath = NormalizePath(path);
 
         foreach (var root in ProtectedRoots.Where(x => !string.IsNullOrWhiteSpace(x)))
         {
-            var normalizedRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var normalizedRoot = NormalizePath(root);
             if (string.Equals(normalizedPath, normalizedRoot, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
 
-            if (!string.Equals(normalizedRoot, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), StringComparison.OrdinalIgnoreCase)
+            if (!string.Equals(normalizedRoot, NormalizePath(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)), StringComparison.OrdinalIgnoreCase)
                 && normalizedPath.StartsWith(normalizedRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
@@ -246,6 +264,32 @@ public sealed class EmptyItemScanService(IHistoryService historyService) : IEmpt
         }
 
         return false;
+    }
+
+    private static bool IsWithinExplicitlyAllowedProtectedScope(string normalizedScanRoot, string normalizedCurrent)
+    {
+        if (!IsProtected(normalizedScanRoot))
+        {
+            return false;
+        }
+
+        return IsSameOrUnderPath(normalizedCurrent, normalizedScanRoot);
+    }
+
+    private static bool IsSameOrUnderPath(string path, string root)
+    {
+        if (string.Equals(path, root, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith(root + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizePath(string path)
+    {
+        return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
     }
 
     private static bool IsReparsePoint(string path)

@@ -20,6 +20,9 @@ public abstract partial class ViewModelBase : ObservableObject
     private bool _isBusy;
 
     [ObservableProperty]
+    private bool _isBlockingBusy;
+
+    [ObservableProperty]
     private string _statusMessage = string.Empty;
 
     [ObservableProperty]
@@ -34,22 +37,23 @@ public abstract partial class ViewModelBase : ObservableObject
     [ObservableProperty]
     private double _progressMaximum = 100;
 
-    protected Task RunBusyAsync(string busyMessage, Func<Task> action)
+    protected Task RunBusyAsync(string busyMessage, Func<Task> action, bool blockUi = true)
     {
-        using var _ = BeginBusyScope(busyMessage);
+        using var _ = BeginBusyScope(busyMessage, blockUi);
         return action();
     }
 
-    protected async Task<T> RunBusyAsync<T>(string busyMessage, Func<Task<T>> action)
+    protected async Task<T> RunBusyAsync<T>(string busyMessage, Func<Task<T>> action, bool blockUi = true)
     {
-        using var _ = BeginBusyScope(busyMessage);
+        using var _ = BeginBusyScope(busyMessage, blockUi);
         return await action();
     }
 
-    protected IDisposable BeginBusyScope(string busyMessage)
+    protected IDisposable BeginBusyScope(string busyMessage, bool blockUi = true)
     {
-        _busyStates.Push(new BusyState(IsBusy, BusyMessage, IsProgressIndeterminate, ProgressValue, ProgressMaximum));
+        _busyStates.Push(new BusyState(IsBusy, IsBlockingBusy, BusyMessage, IsProgressIndeterminate, ProgressValue, ProgressMaximum));
         IsBusy = true;
+        IsBlockingBusy = blockUi;
         BusyMessage = busyMessage;
         IsProgressIndeterminate = true;
         ProgressValue = 0;
@@ -222,6 +226,7 @@ public abstract partial class ViewModelBase : ObservableObject
         if (_busyStates.Count == 0)
         {
             IsBusy = false;
+            IsBlockingBusy = false;
             BusyMessage = "正在处理，请稍候...";
             IsProgressIndeterminate = true;
             ProgressValue = 0;
@@ -231,13 +236,20 @@ public abstract partial class ViewModelBase : ObservableObject
 
         var previous = _busyStates.Pop();
         IsBusy = previous.IsBusy;
+        IsBlockingBusy = previous.IsBlockingBusy;
         BusyMessage = previous.BusyMessage;
         IsProgressIndeterminate = previous.IsProgressIndeterminate;
         ProgressValue = previous.ProgressValue;
         ProgressMaximum = previous.ProgressMaximum;
     }
 
-    private readonly record struct BusyState(bool IsBusy, string BusyMessage, bool IsProgressIndeterminate, double ProgressValue, double ProgressMaximum);
+    partial void OnIsBusyChanged(bool value) => OnBusyStateChanged();
+
+    protected virtual void OnBusyStateChanged()
+    {
+    }
+
+    private readonly record struct BusyState(bool IsBusy, bool IsBlockingBusy, string BusyMessage, bool IsProgressIndeterminate, double ProgressValue, double ProgressMaximum);
 
     private sealed class BusyScope(ViewModelBase owner) : IDisposable
     {

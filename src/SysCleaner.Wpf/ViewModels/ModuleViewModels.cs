@@ -1268,8 +1268,12 @@ public sealed partial class EmptyCleanupItemViewModel : ObservableObject
 
     public CleanupCandidate Candidate { get; }
 
+    public event EventHandler? SelectionChanged;
+
     [ObservableProperty]
     private bool _isSelected = true;
+
+    partial void OnIsSelectedChanged(bool value) => SelectionChanged?.Invoke(this, EventArgs.Empty);
 }
 
 public sealed partial class EmptyCleanupViewModel(IEmptyItemScanService service) : ViewModelBase, IInitializable
@@ -1335,7 +1339,7 @@ public sealed partial class EmptyCleanupViewModel(IEmptyItemScanService service)
         StatusMessage = $"已选择扫描目录：{RootPath}";
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanScan))]
     private async Task ScanAsync()
     {
         if (!ValidateRootPath())
@@ -1354,20 +1358,22 @@ public sealed partial class EmptyCleanupViewModel(IEmptyItemScanService service)
 
         await RunBusyAsync($"正在扫描空项：{RootPath}", async () =>
         {
-            Items.Clear();
+            ClearItems();
             CascadeDeleted.Clear();
             foreach (var item in await service.ScanAsync(RootPath, IncludeSubfolders, MaxScanResults, progress))
             {
-                Items.Add(new EmptyCleanupItemViewModel(item));
+                AddItem(new EmptyCleanupItemViewModel(item));
             }
 
             StatusMessage = Items.Count >= MaxScanResults
                 ? $"已扫描并展示前 {Items.Count} 个空项，模式：{modeText}；结果已达到上限。"
                 : $"已扫描 {Items.Count} 个空项，模式：{modeText}。";
+
+            ExecuteCommand.NotifyCanExecuteChanged();
         });
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanExecute))]
     private async Task ExecuteAsync()
     {
         if (!ValidateRootPath())
@@ -1375,19 +1381,41 @@ public sealed partial class EmptyCleanupViewModel(IEmptyItemScanService service)
             return;
         }
 
+        var selected = Items.Where(x => x.IsSelected).Select(x => x.Candidate).ToList();
+        if (selected.Count == 0)
+        {
+            StatusMessage = "请先勾选要删除的空项。";
+            return;
+        }
+
+        var progress = new Progress<EmptyItemCleanupProgress>(deleteProgress =>
+        {
+            var currentName = string.IsNullOrWhiteSpace(deleteProgress.CurrentPath)
+                ? "准备开始"
+                : Path.GetFileName(deleteProgress.CurrentPath);
+            var busyText = deleteProgress.TotalCandidates == 0
+                ? "正在执行空项清理：没有待处理项。"
+                : $"正在执行空项清理：{currentName} ({deleteProgress.ProcessedCandidates}/{deleteProgress.TotalCandidates})，级联删除 {deleteProgress.CascadeDeletedCount} 个目录。";
+
+            ReportBusyProgress(busyText, deleteProgress.ProcessedCandidates, deleteProgress.TotalCandidates);
+            if (!string.IsNullOrWhiteSpace(deleteProgress.CurrentPath))
+            {
+                StatusMessage = $"正在删除：{deleteProgress.CurrentPath}";
+            }
+        });
+
         await RunBusyAsync("正在执行空项清理", async () =>
         {
             CascadeDeleted.Clear();
-            var selected = Items.Where(x => x.IsSelected).Select(x => x.Candidate).ToList();
-            var cascaded = await service.ExecuteAsync(RootPath, selected);
+            var cascaded = await service.ExecuteAsync(RootPath, selected, progress);
             foreach (var item in cascaded)
             {
                 CascadeDeleted.Add(item);
             }
 
-            StatusMessage = $"已执行 {selected.Count} 个空项删除，级联删除 {CascadeDeleted.Count} 个父目录。";
-            await ScanAsync();
-        });
+            RemoveDeletedItems(selected, cascaded);
+            StatusMessage = $"已执行 {selected.Count} 个空项删除，级联删除 {CascadeDeleted.Count} 个父目录，当前列表剩余 {Items.Count} 项。";
+        }, blockUi: false);
     }
 
     partial void OnIncludeSubfoldersChanged(bool value)
@@ -1453,11 +1481,89 @@ public sealed partial class EmptyCleanupViewModel(IEmptyItemScanService service)
 
     private bool CanActOnSelectedItem() => SelectedItem is not null;
 
+    private bool CanScan() => !IsBusy;
+
+    private bool CanExecute() => Items.Any(item => item.IsSelected);
+
     partial void OnSelectedItemChanged(EmptyCleanupItemViewModel? value)
     {
         ToggleSelectedItemCommand.NotifyCanExecuteChanged();
         SelectOnlyCurrentItemCommand.NotifyCanExecuteChanged();
         CopySelectedPathCommand.NotifyCanExecuteChanged();
+    }
+
+    private void AddItem(EmptyCleanupItemViewModel item)
+    {
+        item.SelectionChanged += OnItemSelectionChanged;
+        Items.Add(item);
+    }
+
+    private void ClearItems()
+    {
+        foreach (var item in Items)
+        {
+            item.SelectionChanged -= OnItemSelectionChanged;
+        }
+
+        Items.Clear();
+        if (SelectedItem is not null)
+        {
+            SelectedItem = null;
+        }
+    }
+
+    private void RemoveDeletedItems(IReadOnlyCollection<CleanupCandidate> deletedCandidates, IReadOnlyCollection<CleanupCandidate> cascadedCandidates)
+    {
+        var deletedRoots = deletedCandidates
+            .Select(item => item.TargetPath)
+            .Concat(cascadedCandidates.Select(item => item.TargetPath))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        for (var index = Items.Count - 1; index >= 0; index--)
+        {
+            var item = Items[index];
+            if (!deletedRoots.Any(path => IsSameOrUnderPath(item.Candidate.TargetPath, path)))
+            {
+                continue;
+            }
+
+            item.SelectionChanged -= OnItemSelectionChanged;
+            if (ReferenceEquals(SelectedItem, item))
+            {
+                SelectedItem = null;
+            }
+
+            Items.RemoveAt(index);
+        }
+
+        ExecuteCommand.NotifyCanExecuteChanged();
+    }
+
+    private void OnItemSelectionChanged(object? sender, EventArgs e) => ExecuteCommand.NotifyCanExecuteChanged();
+
+    private static bool IsSameOrUnderPath(string candidatePath, string deletedPath)
+    {
+        if (string.Equals(candidatePath, deletedPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var normalizedDeletedPath = deletedPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (normalizedDeletedPath.Length == 0)
+        {
+            return false;
+        }
+
+        var prefix = normalizedDeletedPath + Path.DirectorySeparatorChar;
+        return candidatePath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+            || candidatePath.StartsWith(normalizedDeletedPath + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+    }
+
+    protected override void OnBusyStateChanged()
+    {
+        ScanCommand.NotifyCanExecuteChanged();
+        ExecuteCommand.NotifyCanExecuteChanged();
     }
 
     private bool ValidateRootPath()

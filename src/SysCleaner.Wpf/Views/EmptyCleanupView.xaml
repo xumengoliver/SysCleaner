@@ -60,7 +60,7 @@
                     <TextBlock Text="{Binding RootPathRiskMessage}" Foreground="{StaticResource Brush.Warning}" TextWrapping="Wrap" />
                 </Border>
                 <Border Style="{StaticResource ChipBorderStyle}" Margin="0,12,0,0" Background="White" HorizontalAlignment="Left">
-                    <TextBlock Text="执行前请检查选中项路径；可切换为仅当前层扫描，级联删除仍会继续移除新变空的父目录。" Foreground="{StaticResource Brush.SecondaryText}" />
+                    <TextBlock Text="执行前请检查选中项路径；如果你显式选择了安装目录，系统也会尝试清理其中需要管理员权限的空文件或空文件夹，普通删除失败时会自动接管所有权并重试。" Foreground="{StaticResource Brush.SecondaryText}" TextWrapping="Wrap" />
                 </Border>
                 <Border Style="{StaticResource ChipBorderStyle}" Margin="0,12,0,0" Background="{StaticResource Brush.AccentSoft}" HorizontalAlignment="Left">
                     <TextBlock Text="{Binding ScanResultLimitDescription}" Foreground="{StaticResource Brush.Accent}" TextWrapping="Wrap" />
@@ -68,8 +68,14 @@
             </StackPanel>
         </Border>
 
-        <WrapPanel Grid.Row="1" Margin="0,18,0,0" ItemWidth="520">
-            <Border Width="640" Margin="0,0,18,18" Style="{StaticResource CardBorderStyle}" Padding="20,16,20,20">
+        <Grid Grid.Row="1" Margin="0,18,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="7*" />
+                <ColumnDefinition Width="18" />
+                <ColumnDefinition Width="4*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource CardBorderStyle}" Padding="20,16,20,20">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -101,24 +107,34 @@
                 </Grid>
             </Border>
 
-            <Border Width="380" Margin="0,0,18,18" Style="{StaticResource CardBorderStyle}">
-                <StackPanel>
-                    <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="级联删除结果" />
-                    <TextBlock Margin="0,6,0,0" Text="这里展示本次执行后继续变空并被一并删除的目录。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
-                    <ItemsControl Margin="0,12,0,0" ItemsSource="{Binding CascadeDeleted}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Margin="0,0,0,8" Padding="10" Background="White" CornerRadius="12" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1">
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
-                                        <TextBlock Margin="0,4,0,0" Text="{Binding TargetPath}" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </StackPanel>
+            <Border Grid.Column="2" Style="{StaticResource CardBorderStyle}" Padding="20,16,20,20">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitleTextStyle}" Text="级联删除结果" />
+                        <TextBlock Margin="0,6,0,0" Text="这里展示本次执行后继续变空并被一并删除的目录。" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                    </StackPanel>
+
+                    <ScrollViewer Grid.Row="1" Margin="0,12,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding CascadeDeleted}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,0,8" Padding="10" Background="White" CornerRadius="12" BorderBrush="{StaticResource Brush.Border}" BorderThickness="1">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                            <TextBlock Margin="0,4,0,0" Text="{Binding TargetPath}" TextWrapping="Wrap" Foreground="{StaticResource Brush.SecondaryText}" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
             </Border>
-        </WrapPanel>
+        </Grid>
     </Grid>
 </UserControl>
